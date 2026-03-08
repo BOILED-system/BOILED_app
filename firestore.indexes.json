@@ -1,0 +1,47 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "practice_categories",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "circleId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "order",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "events",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "circleId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "practice_series",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "circleId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

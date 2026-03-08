@@ -1,0 +1,60 @@
+# API (apps/api) を Cloud Run にビルド・デプロイする CD
+# main への push で apps/api に変更があったときのみ実行
+name: Deploy API to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+  workflow_dispatch: # 手動実行も可能
+
+env:
+  REGION: asia-northeast1
+  SERVICE_NAME: circle-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build and push image
+        working-directory: ./apps/api
+        run: |
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/circle-api:latest .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/circle-api:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/circle-api:latest \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" \
+            --set-secrets "GEMINI_API_KEY=gemini-api-key:latest" \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Show URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --format 'value(status.url)')
+          echo "Deployed: $URL"
+          echo "url=$URL" >> $GITHUB_OUTPUT
