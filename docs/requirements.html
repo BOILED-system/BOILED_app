@@ -454,8 +454,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_3_1_イベントスケジュール管理">3.1. 3.1. イベント・スケジュール管理</a></li>
 <li><a href="#_3_2_出欠管理rsvp_attendance">3.2. 3.2. 出欠管理（RSVP &amp; Attendance）</a></li>
 <li><a href="#_3_3_清算集金管理settlement">3.3. 3.3. 清算・集金管理（Settlement）</a></li>
-<li><a href="#_3_4_aiチャットアシスタントgemini">3.4. 3.4. AIチャットアシスタント（Gemini）</a></li>
-<li><a href="#_3_5_認証とセキュリティ">3.5. 3.5. 認証とセキュリティ</a></li>
+<li><a href="#_3_4_認証とセキュリティ">3.4. 3.4. 認証とセキュリティ</a></li>
 </ul>
 </li>
 <li><a href="#_4_今後の拡張見込み要件フェーズ2以降">4. 4. 今後の拡張見込み要件（フェーズ2以降）</a></li>
@@ -470,9 +469,9 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <h3 id="_1_1_目的">1.1. 1.1. 目的</h3>
 <div class="paragraph">
 <p>大規模になりがちなダンスサークルの運営において、以下の課題を解決する。
-* 幹部やナンバーリーダー（振付師）への同じ質問（スタジオの場所、集合時間、衣装など）の集中をAIで防ぐ
 * 複雑な集金（全体参加費、ナンバーごとのスタジオ代、衣装代など）の未払い管理を効率化する
-* 深夜練や全体リハなど、多岐にわたるスケジュールの出欠を正確に把握する</p>
+* 深夜練や全体リハなど、多岐にわたるスケジュールの出欠を正確に把握する
+* （※将来的な展望として）幹部やジャンルリーダー（振付師）への同じ質問（スタジオの場所、集合時間、衣装など）の集中をAIで防ぐ事も視野に入れる</p>
 </div>
 </div>
 <div class="sect2">
@@ -480,7 +479,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="ulist">
 <ul>
 <li>
-<p><strong>サークル幹部・ナンバーリーダー（Admin）:</strong> イベント企画、集金管理、お知らせ発信を行う。</p>
+<p><strong>サークル幹部・ジャンルリーダー（Admin）:</strong> イベント企画、集金管理、お知らせ発信を行う。</p>
 </li>
 <li>
 <p><strong>一般メンバー（Member）:</strong> イベントへの参加、お知らせの確認、出欠登録、支払いを行う。</p>
@@ -533,13 +532,13 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Admin（管理者）</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">幹部、代表、会計、各ナンバーのリーダー</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">幹部、代表、会計、ジャンルリーダー</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">イベント作成/編集、お知らせ作成/編集、清算作成、全メンバーの出欠・支払い状況の確認とリマインド送付</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Member（一般）</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">一般のサークルメンバー</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">イベント閲覧、お知らせ閲覧、自身の出欠登録、自身の支払い報告、AIチャットの利用</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">イベント閲覧、お知らせ閲覧、自身の出欠登録、自身の支払い報告</p></td>
 </tr>
 </tbody>
 </table>
@@ -643,45 +642,18 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 </div>
 <div class="sect2">
-<h3 id="_3_4_aiチャットアシスタントgemini">3.4. 3.4. AIチャットアシスタント（Gemini）</h3>
+<h3 id="_3_4_認証とセキュリティ">3.4. 3.4. 認証とセキュリティ</h3>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>お知らせベースの自動応答</strong></p>
+<p><strong>ユーザー認証（会員番号による簡易ログイン）</strong></p>
 <div class="ulist">
 <ul>
 <li>
-<p>アプリ内に投稿された「お知らせ」や「イベント詳細」をRAG（Retrieval-Augmented Generation）のコンテキストとして読み込み、メンバーからの質問に自動で答える。</p>
+<p>「お金のやり取りは最終的にPayPayや銀行振込の『名義人機能』で担保されるため、アプリ上での厳密ななりすまし対策は不要」という方針に基づく。</p>
 </li>
 <li>
-<p>例：「明日のM1（1曲目）の深夜練、どこのスタジオだっけ？」「衣装は黒Tシャツでいいですか？」</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p><strong>ハルシネーション（嘘）の防止</strong></p>
-<div class="ulist">
-<ul>
-<li>
-<p>お知らせに記載がない情報については「記載がないため、ナンバーリーダーに確認してください」と安全に返答する。</p>
-</li>
-</ul>
-</div>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_3_5_認証とセキュリティ">3.5. 3.5. 認証とセキュリティ</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><strong>ユーザー認証</strong></p>
-<div class="ulist">
-<ul>
-<li>
-<p>Googleアカウント、LINE、またはメールアドレス等を用いたログイン機能（MVPの <code>X-User-Id</code> ダミー認証からの移行）。</p>
+<p>会員が自身の「会員番号」のみを入力することでログイン（セッション確立）できる使い勝手最優先の設計を正とする。</p>
 </li>
 </ul>
 </div>
@@ -691,7 +663,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="ulist">
 <ul>
 <li>
-<p>Firestoreのセキュリティルールにより、別サークルのデータや、他人の決済情報にアクセスできないよう堅牢な保護を行う。</p>
+<p>Firestoreのセキュリティルールにより、別サークルのデータにアクセスできないよう保護を行う。</p>
 </li>
 </ul>
 </div>
@@ -711,7 +683,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p><strong>ナンバー・チーム管理機能</strong>: サークル内に紐づく「ナンバー（曲）」のグループを作成し、お知らせや清算の宛先をナンバー単位で一括指定する機能。</p>
 </li>
 <li>
-<p><strong>LINE Bot 連携</strong>: アプリを開かなくても、LINEのグループトーク上でAIに質問できる機能。</p>
+<p><strong>AIチャットアシスタント（優先度低）</strong>: お知らせをベースにメンバーからの質問に自動応答するAI機能（RAG）。</p>
+</li>
+<li>
+<p><strong>LINE Bot 連携</strong>: アプリを開かなくても、LINEのグループトーク上でAI等に質問したり通知を受け取る機能。</p>
 </li>
 </ol>
 </div>
@@ -720,7 +695,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-03-08 13:43:31 +0900
+Last updated 2026-03-10 23:22:40 +0900
 </div>
 </div>
 </body>
