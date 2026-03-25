@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 
 const navItems = [
     { href: '/profile', label: 'ホーム' },
-    { href: '/announcements', label: 'お知らせ' },
+    { href: '/practices', label: '出欠登録' },
     { href: '/events', label: 'イベント' },
-    { href: '/practices', label: '練習' }, // Added
+    { href: '/calendar', label: 'カレンダー' },
     { href: '/payments', label: '精算' },
 ];
 
@@ -23,7 +23,7 @@ export default function BottomNav() {
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex items-center justify-center px-4 py-2 text-xs font-medium transition-colors ${isActive
+                            className={`flex items-center justify-center px-2 py-2 text-xs font-medium transition-colors ${isActive
                                 ? 'text-white'
                                 : 'text-white/25 hover:text-white/50'
                                 }`}

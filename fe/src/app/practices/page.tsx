@@ -1,295 +1,271 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api, PracticeCategory, PracticeSeries } from '@/lib/api/client';
-import { DEFAULT_CIRCLE_ID } from '@/lib/constants';
+import { getPracticeSessions, createPracticeSession } from '@/lib/firestore';
 
-const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 
 export default function PracticesPage() {
-    const [categories, setCategories] = useState<PracticeCategory[]>([]);
-    const [seriesList, setSeriesList] = useState<PracticeSeries[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [userRole, setUserRole] = useState('');
+  const [activeType, setActiveType] = useState<'regular' | 'event'>('regular');
+  const [form, setForm] = useState({
+    name: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    location: '',
+    note: '',
+    targetGenerations: [] as number[],
+    targetGenres: [] as string[],
+  });
 
-    // Admin form state
-    const [showCategoryForm, setShowCategoryForm] = useState(false);
-    const [showSeriesForm, setShowSeriesForm] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [newCategoryParent, setNewCategoryParent] = useState('');
-    const [newSeries, setNewSeries] = useState({
-        name: '', categoryId: '', dayOfWeek: 6, startTime: '14:00', location: '', fee: 0,
-    });
+  useEffect(() => {
+    setUserRole(localStorage.getItem('userRole') || 'member');
+    load();
+  }, []);
 
-    const load = useCallback(async () => {
-        try {
-            const [cats, series] = await Promise.all([
-                api.getPracticeCategories(DEFAULT_CIRCLE_ID),
-                api.getPracticeSeries(DEFAULT_CIRCLE_ID),
-            ]);
-            setCategories(cats || []);
-            setSeriesList(series || []);
-        } catch {
-            setCategories([]);
-            setSeriesList([]);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => { load(); }, [load]);
-
-    // Build category tree
-    const rootCategories = categories.filter(c => !c.parentId);
-    const getChildren = (parentId: string) => categories.filter(c => c.parentId === parentId);
-
-    const filtered = selectedCategory === 'all'
-        ? seriesList
-        : seriesList.filter(s => {
-            if (s.categoryId === selectedCategory) return true;
-            // Also match children of selected category
-            const children = getChildren(selectedCategory);
-            return children.some(c => c.id === s.categoryId);
-        });
-
-    const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || '';
-
-    const handleCreateCategory = async () => {
-        if (!newCategoryName.trim()) return;
-        await api.createPracticeCategory({
-            circleId: DEFAULT_CIRCLE_ID,
-            name: newCategoryName.trim(),
-            parentId: newCategoryParent || undefined,
-        });
-        setNewCategoryName('');
-        setNewCategoryParent('');
-        setShowCategoryForm(false);
-        load();
-    };
-
-    const handleCreateSeries = async () => {
-        if (!newSeries.name.trim() || !newSeries.categoryId) return;
-        await api.createPracticeSeries({
-            circleId: DEFAULT_CIRCLE_ID,
-            ...newSeries,
-        });
-        setNewSeries({ name: '', categoryId: '', dayOfWeek: 6, startTime: '14:00', location: '', fee: 0 });
-        setShowSeriesForm(false);
-        load();
-    };
-
-    const handleDeleteCategory = async (id: string) => {
-        if (!confirm('このカテゴリを削除しますか？')) return;
-        try {
-            await api.deletePracticeCategory(id);
-            if (selectedCategory === id) setSelectedCategory('all');
-            load();
-        } catch (e) {
-            console.error('Failed to delete category', e);
-            alert('カテゴリの削除に失敗しました。');
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    return (
-        <div className="max-w-2xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-white">練習</h1>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowCategoryForm(!showCategoryForm)}
-                        className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-white/60 rounded-lg transition-colors"
-                    >
-                        + カテゴリ
-                    </button>
-                    <button
-                        onClick={() => setShowSeriesForm(!showSeriesForm)}
-                        className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
-                    >
-                        + シリーズ
-                    </button>
-                </div>
-            </div>
-
-            {/* Category Form */}
-            {showCategoryForm && (
-                <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-3 animate-fade-in">
-                    <p className="text-xs font-medium text-white/40 uppercase tracking-wider">カテゴリ作成</p>
-                    <input
-                        type="text"
-                        placeholder="カテゴリ名（例: シングルス）"
-                        value={newCategoryName}
-                        onChange={e => setNewCategoryName(e.target.value)}
-                        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
-                    />
-                    <select
-                        value={newCategoryParent}
-                        onChange={e => setNewCategoryParent(e.target.value)}
-                        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
-                    >
-                        <option value="">親カテゴリなし（ルート）</option>
-                        {categories.map(c => (
-                            <option key={c.id} value={c.id}>{c.parentId ? '  └ ' : ''}{c.name}</option>
-                        ))}
-                    </select>
-                    <div className="flex justify-end gap-2">
-                        <button onClick={() => setShowCategoryForm(false)} className="text-xs px-3 py-1.5 text-white/40 hover:text-white/60">キャンセル</button>
-                        <button onClick={handleCreateCategory} className="text-xs px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">作成</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Series Form */}
-            {showSeriesForm && (
-                <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-3 animate-fade-in">
-                    <p className="text-xs font-medium text-white/40 uppercase tracking-wider">シリーズ作成</p>
-                    <input
-                        type="text"
-                        placeholder="シリーズ名（例: 土曜午後練習）"
-                        value={newSeries.name}
-                        onChange={e => setNewSeries({ ...newSeries, name: e.target.value })}
-                        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
-                    />
-                    <select
-                        value={newSeries.categoryId}
-                        onChange={e => setNewSeries({ ...newSeries, categoryId: e.target.value })}
-                        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
-                    >
-                        <option value="">カテゴリを選択</option>
-                        {categories.map(c => (
-                            <option key={c.id} value={c.id}>{c.parentId ? '  └ ' : ''}{c.name}</option>
-                        ))}
-                    </select>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-[11px] text-white/30 block mb-1">曜日</label>
-                            <select
-                                value={newSeries.dayOfWeek}
-                                onChange={e => setNewSeries({ ...newSeries, dayOfWeek: parseInt(e.target.value) })}
-                                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                            >
-                                {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}曜</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[11px] text-white/30 block mb-1">時間</label>
-                            <input
-                                type="time"
-                                value={newSeries.startTime}
-                                onChange={e => setNewSeries({ ...newSeries, startTime: e.target.value })}
-                                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                            />
-                        </div>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="場所"
-                        value={newSeries.location}
-                        onChange={e => setNewSeries({ ...newSeries, location: e.target.value })}
-                        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
-                    />
-                    <div>
-                        <label className="text-[11px] text-white/30 block mb-1">参加費（1回）</label>
-                        <input
-                            type="number"
-                            value={newSeries.fee}
-                            onChange={e => setNewSeries({ ...newSeries, fee: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <button onClick={() => setShowSeriesForm(false)} className="text-xs px-3 py-1.5 text-white/40 hover:text-white/60">キャンセル</button>
-                        <button onClick={handleCreateSeries} className="text-xs px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">作成</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Category Filter */}
-            {categories.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    <button
-                        onClick={() => setSelectedCategory('all')}
-                        className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${selectedCategory === 'all'
-                            ? 'bg-white text-black'
-                            : 'bg-white/[0.06] text-white/50 hover:text-white/80'
-                            }`}
-                    >
-                        全て
-                    </button>
-                    {rootCategories.map(cat => (
-                        <div key={cat.id} className="flex items-center gap-0.5 shrink-0">
-                            <button
-                                onClick={() => setSelectedCategory(cat.id)}
-                                className={`text-xs px-3 py-1.5 rounded-l-full transition-colors ${selectedCategory === cat.id
-                                    ? 'bg-white text-black'
-                                    : 'bg-white/[0.06] text-white/50 hover:text-white/80'
-                                    }`}
-                            >
-                                {cat.name}
-                            </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.id); }}
-                                className="text-xs px-2 py-1.5 rounded-r-full bg-red-500/20 text-red-400 hover:bg-red-500/40 hover:text-red-300 transition-colors border-l border-red-500/20"
-                                title="カテゴリを削除"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Series List */}
-            {filtered.length === 0 ? (
-                <div className="text-center py-16">
-                    <p className="text-white/30 text-sm">練習シリーズがありません</p>
-                    <p className="text-white/20 text-xs mt-1">「+ シリーズ」から作成してください</p>
-                </div>
-            ) : (
-                <div className="space-y-2">
-                    {filtered.map(series => (
-                        <Link
-                            key={series.id}
-                            href={`/practices/${series.id}`}
-                            className="block bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.06] transition-colors group"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="text-sm font-medium text-white truncate">{series.name}</h3>
-                                    <div className="flex items-center gap-3 mt-1.5">
-                                        <span className="text-xs text-white/40">
-                                            {DAY_LABELS[series.dayOfWeek]}曜 {series.startTime}
-                                        </span>
-                                        {series.location && (
-                                            <span className="text-xs text-white/30 truncate">{series.location}</span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0 ml-4">
-                                    {getCategoryName(series.categoryId) && (
-                                        <span className="text-[10px] px-2 py-0.5 bg-white/[0.06] text-white/40 rounded-full">
-                                            {getCategoryName(series.categoryId)}
-                                        </span>
-                                    )}
-                                    {series.fee > 0 && (
-                                        <span className="text-xs text-white/30">¥{series.fee.toLocaleString()}</span>
-                                    )}
-                                    <span className="text-white/20 group-hover:text-blue-400 transition-colors">→</span>
-                                </div>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-            )}
-        </div>
+  const load = async () => {
+    const data = await getPracticeSessions();
+    const sorted = data.sort((a: any, b: any) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
     );
+    setSessions(sorted);
+    setLoading(false);
+  };
+
+  const handleCreate = async () => {
+    if (!form.name || !form.date || !form.startTime || !form.location) {
+      alert('練習名・日付・開始時間・場所は必須です');
+      return;
+    }
+    await createPracticeSession({ ...form, type: activeType });
+    setShowForm(false);
+    setForm({ name: '', date: '', startTime: '', endTime: '', location: '', note: '', targetGenerations: [], targetGenres: [] });
+    load();
+  };
+
+  const toggleGenre = (genre: string) => {
+    setForm(f => ({
+      ...f,
+      targetGenres: f.targetGenres.includes(genre)
+        ? f.targetGenres.filter(g => g !== genre)
+        : [...f.targetGenres, genre],
+    }));
+  };
+
+  const toggleGeneration = (gen: number) => {
+    setForm(f => ({
+      ...f,
+      targetGenerations: f.targetGenerations.includes(gen)
+        ? f.targetGenerations.filter(g => g !== gen)
+        : [...f.targetGenerations, gen],
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-white">練習</h1>
+        {userRole === 'admin' && (
+          <div className="flex gap-2">
+            <select
+              value={activeType}
+              onChange={e => setActiveType(e.target.value as 'regular' | 'event')}
+              className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg focus:outline-none"
+            >
+              <option value="regular">正規練</option>
+              <option value="event">イベント練</option>
+            </select>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
+            >
+              + 練習を追加
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 作成フォーム */}
+      {showForm && (
+        <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-3">
+          <p className="text-xs font-medium text-white/40 uppercase tracking-wider">
+            {activeType === 'regular' ? '正規練' : 'イベント練'}を作成
+          </p>
+
+          <input
+            type="text"
+            placeholder={activeType === 'regular' ? '例：Hiphop正規練' : '例：夏イベ Hiphopナンバー練'}
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
+          />
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[11px] text-white/30 block mb-1">日付</label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={e => setForm({ ...form, date: e.target.value })}
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-white/30 block mb-1">開始</label>
+              <input
+                type="time"
+                value={form.startTime}
+                onChange={e => setForm({ ...form, startTime: e.target.value })}
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-white/30 block mb-1">終了</label>
+              <input
+                type="time"
+                value={form.endTime}
+                onChange={e => setForm({ ...form, endTime: e.target.value })}
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <input
+            type="text"
+            placeholder="場所（例：マイスタ4B）"
+            value={form.location}
+            onChange={e => setForm({ ...form, location: e.target.value })}
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
+          />
+
+          <textarea
+            placeholder="メモ（任意）"
+            value={form.note}
+            onChange={e => setForm({ ...form, note: e.target.value })}
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none resize-none"
+            rows={2}
+          />
+
+          {activeType === 'regular' && (
+            <>
+              <div>
+                <label className="text-[11px] text-white/30 block mb-2">対象ジャンル（空=全員）</label>
+                <div className="flex flex-wrap gap-2">
+                  {GENRES.map(g => (
+                    <button
+                      key={g}
+                      onClick={() => toggleGenre(g)}
+                      className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                        form.targetGenres.includes(g)
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/[0.06] text-white/50 hover:text-white/80'
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] text-white/30 block mb-2">対象期（空=全員）</label>
+                <div className="flex flex-wrap gap-2">
+                  {[13, 14, 15, 16, 17].map(gen => (
+                    <button
+                      key={gen}
+                      onClick={() => toggleGeneration(gen)}
+                      className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                        form.targetGenerations.includes(gen)
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-white/[0.06] text-white/50 hover:text-white/80'
+                      }`}
+                    >
+                      {gen}期
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeType === 'event' && (
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg px-3 py-3 text-xs text-white/30">
+              対象者はGoogle Form連携で自動設定予定（現在は全員対象）
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowForm(false)} className="text-xs px-3 py-1.5 text-white/40 hover:text-white/60">キャンセル</button>
+            <button onClick={handleCreate} className="text-xs px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">作成</button>
+          </div>
+        </div>
+      )}
+
+      {/* 練習一覧（時系列） */}
+      {sessions.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-white/30 text-sm">練習がまだありません</p>
+          {userRole === 'admin' && (
+            <p className="text-white/20 text-xs mt-1">「+ 練習を追加」から作成してください</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sessions.map((session: any) => (
+            <Link
+              key={session.id}
+              href={`/practices/${session.id}`}
+              className="block bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.06] transition-colors group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {session.type === 'event' ? (
+                      <span className="text-[10px] px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-medium text-white truncate">{session.name}</h3>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <span className="text-xs text-white/40">
+                      {session.date} {session.startTime}〜{session.endTime}
+                    </span>
+                    {session.location && (
+                      <span className="text-xs text-white/30 truncate">{session.location}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {session.targetGenres?.map((g: string) => (
+                      <span key={g} className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">{g}</span>
+                    ))}
+                    {session.targetGenerations?.map((g: number) => (
+                      <span key={g} className="text-[10px] px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">{g}期</span>
+                    ))}
+                    {(!session.targetGenres?.length && !session.targetGenerations?.length) && (
+                      <span className="text-[10px] px-2 py-0.5 bg-white/[0.06] text-white/30 rounded-full">全員</span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-white/20 group-hover:text-blue-400 transition-colors ml-4">→</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

@@ -6,7 +6,7 @@ import {
     User, AnnouncementDetail, UpdateEventRequest, AnnouncementPayment
 } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://circle-api-za2cxc4exa-an.a.run.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:9999';
 
 // Default user ID for MVP
 const DEFAULT_USER_ID = 'demo-user-1';

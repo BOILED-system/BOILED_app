@@ -13,7 +13,7 @@ export default function Header({ circleName = "BOILED" }: HeaderProps) {
 
   const navLinks = [
     { href: "/profile", label: "ホーム" },
-    { href: "/announcements", label: "お知らせ" },
+    { href: "/practices", label: "出欠登録" },
     { href: "/events", label: "イベント" },
     { href: "/calendar", label: "カレンダー" },
     { href: "/payments", label: "精算" },

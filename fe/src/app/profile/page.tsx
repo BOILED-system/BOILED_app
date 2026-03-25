@@ -2,15 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getUser } from "@/lib/firestore";
-
-interface AlertItem {
-  type: "rsvp" | "payment";
-  eventTitle: string;
-  subTitle?: string;
-  amount?: number;
-  link: string;
-}
+import { getUser, getUpcomingUnregisteredSessions, PracticeSession } from "@/lib/firestore";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<{
@@ -20,6 +12,7 @@ export default function ProfilePage() {
     role: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unregistered, setUnregistered] = useState<PracticeSession[]>([]);
 
   useEffect(() => {
     const memberId = localStorage.getItem("memberId");
@@ -34,6 +27,9 @@ export default function ProfilePage() {
       }
       setUser(u as any);
       setLoading(false);
+
+      // 直近1週間の出欠未登録を非同期で取得（プロフィール表示をブロックしない）
+      getUpcomingUnregisteredSessions(memberId).then(setUnregistered);
     });
   }, []);
 
@@ -58,7 +54,7 @@ export default function ProfilePage() {
               <div>
                 <h1 className="text-xl font-bold text-white">{user?.name}</h1>
                 <p className="text-white/50 text-sm mt-1">
-                  {user?.generation} {user?.genre}
+                  {user?.generation}期 {user?.genre}
                 </p>
                 {user?.role === "admin" && (
                   <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded mt-1 inline-block">
@@ -75,11 +71,36 @@ export default function ProfilePage() {
           <h2 className="text-sm font-medium text-white/60 uppercase tracking-wider pl-1">
             アクション
           </h2>
-          <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-8 text-center">
-            <p className="text-white/50 text-sm">
-              現在対応が必要なものはありません
-            </p>
-          </div>
+
+          {unregistered.length > 0 ? (
+            <div className="space-y-2">
+              {unregistered.map(session => (
+                <Link
+                  key={session.id}
+                  href={`/practices/${session.id}`}
+                  className="block bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 hover:bg-yellow-500/15 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-medium text-yellow-300">出欠未登録</p>
+                      <p className="text-sm text-white/80 mt-0.5">{session.name}</p>
+                      <p className="text-xs text-white/40 mt-0.5">
+                        {session.date} {session.startTime}
+                        {session.location && ` · ${session.location}`}
+                      </p>
+                    </div>
+                    <span className="text-yellow-400 text-xs flex-shrink-0">登録 →</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-8 text-center">
+              <p className="text-white/50 text-sm">
+                現在対応が必要なものはありません
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
