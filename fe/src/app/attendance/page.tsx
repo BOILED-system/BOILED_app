@@ -49,28 +49,33 @@ export default function AttendancePage() {
   }, []);
 
   const load = async (mid: string, role: string) => {
-    const sessions = await getPracticeSessions();
-    const today = new Date().toISOString().split('T')[0];
-    const upcoming = sessions
-      .filter(s => s.date >= today)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    const past = sessions
-      .filter(s => s.date < today)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const sorted = [...upcoming, ...past];
+    try {
+      const sessions = await getPracticeSessions();
+      const today = new Date().toISOString().split('T')[0];
+      const upcoming = sessions
+        .filter(s => s.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const past = sessions
+        .filter(s => s.date < today)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      const sorted = [...upcoming, ...past];
 
-    const result = await Promise.all(
-      sorted.map(async session => {
-        const [myRSVP, allRSVPs] = await Promise.all([
-          mid ? getMyRSVP(session.id, mid) : Promise.resolve(null),
-          role === 'admin' ? getSessionRSVPs(session.id) : Promise.resolve([]),
-        ]);
-        return { session, myRSVP, allRSVPs };
-      })
-    );
+      const result = await Promise.all(
+        sorted.map(async session => {
+          const [myRSVP, allRSVPs] = await Promise.all([
+            mid ? getMyRSVP(session.id, mid) : Promise.resolve(null),
+            role === 'admin' ? getSessionRSVPs(session.id) : Promise.resolve([]),
+          ]);
+          return { session, myRSVP, allRSVPs };
+        })
+      );
 
-    setRows(result);
-    setLoading(false);
+      setRows(result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleQuickRSVP = async (sessionId: string, status: 'GO' | 'NO') => {
@@ -267,7 +272,7 @@ export default function AttendancePage() {
                           <div>
                             <span className="text-xs text-white/60">{rsvp.name}</span>
                             <span className="text-[10px] text-white/30 ml-1.5">
-                              {rsvp.generation ? `${rsvp.generation}期` : ''} {rsvp.genre}
+                              {rsvp.generation ? `${rsvp.generation}代` : ''} {rsvp.genre}
                             </span>
                             {rsvp.note && (
                               <p className="text-[10px] text-white/25 mt-0.5">{rsvp.note}</p>

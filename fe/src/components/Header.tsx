@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import UserSwitcher from "./UserSwitcher";
+import UserMenu from "./UserMenu";
 
 interface HeaderProps {
   circleName?: string;
@@ -51,13 +51,13 @@ export default function Header({ circleName = "BOILED" }: HeaderProps) {
 
             {/* User Switcher */}
             <div className="ml-4 pl-4 border-l border-white/10">
-              <UserSwitcher />
+              <UserMenu />
             </div>
           </nav>
 
           {/* Mobile User Switcher */}
           <div className="md:hidden">
-            <UserSwitcher />
+            <UserMenu />
           </div>
         </div>
       </div>
