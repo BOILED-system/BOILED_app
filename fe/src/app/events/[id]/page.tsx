@@ -93,17 +93,21 @@ export default function EventDetailPage() {
         </div>
 
         {/* タイムテーブル */}
-        {event.timetable && event.timetable.length > 0 && (
+        {(event.timetableImageUrl || (event.timetable && event.timetable.length > 0)) && (
           <div>
             <p className="text-[11px] text-white/30 uppercase tracking-wider mb-3">タイムテーブル</p>
-            <div>
-              {event.timetable.map((row, i) => (
-                <div key={i} className="flex items-start gap-4 py-2.5 border-b border-white/[0.05] last:border-0">
-                  <span className="text-sm font-mono text-white/40 w-12 shrink-0 pt-0.5">{row.time}</span>
-                  <span className="text-sm text-white/80">{row.description}</span>
-                </div>
-              ))}
-            </div>
+            {event.timetableImageUrl ? (
+              <img src={event.timetableImageUrl} alt="タイムテーブル" className="w-full rounded-lg" />
+            ) : (
+              <div>
+                {event.timetable.map((row, i) => (
+                  <div key={i} className="flex items-start gap-4 py-2.5 border-b border-white/[0.05] last:border-0">
+                    <span className="text-sm font-mono text-white/40 w-12 shrink-0 pt-0.5">{row.time}</span>
+                    <span className="text-sm text-white/80">{row.description}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

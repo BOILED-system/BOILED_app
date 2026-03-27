@@ -177,6 +177,7 @@ export interface BoiledEvent {
   meetingTime: string;
   meetingLocation: string;
   timetable: TimetableRow[];
+  timetableImageUrl?: string;
   note: string;
   imageUrls: string[];
   createdAt: any;

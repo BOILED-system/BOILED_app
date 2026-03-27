@@ -71,8 +71,8 @@ export default function CalendarPage() {
   };
 
   const getGoogleCalendarUrl = (genre: string) => {
-    const icalUrl = getICalUrl(genre);
-    return `https://www.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
+    const icalUrl = getICalUrl(genre).replace(/^https?:\/\//, 'webcal://');
+    return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
   };
 
   if (loading) {
