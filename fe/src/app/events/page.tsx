@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getEvents, createEvent, deleteEvent, BoiledEvent, TimetableRow } from '@/lib/firestore';
+import { getEvents, createEvent, deleteEvent } from '@/lib/api';
+import type { BoiledEvent, TimetableRow } from '@/lib/api';
 
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 

@@ -11,10 +11,8 @@ import {
   getNumberRosters,
   getUser,
   isSessionForMember,
-  PracticeSession,
-  NumberRoster,
-  TargetType,
-} from '@/lib/firestore';
+} from '@/lib/api';
+import type { PracticeSession, NumberRoster, TargetType } from '@/lib/api';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 

@@ -12,11 +12,8 @@ import {
   deletePracticeSession,
   getNumberRosters,
   getUser,
-  PracticeSession,
-  PracticeRSVP,
-  NumberRoster,
-  TargetType,
-} from '@/lib/firestore';
+} from '@/lib/api';
+import type { PracticeSession, PracticeRSVP, NumberRoster, TargetType } from '@/lib/api';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 const GENERATIONS = [16, 17];

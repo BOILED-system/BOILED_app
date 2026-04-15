@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getPracticeSessions, getMyRSVP, getNumberRosters, getUser, isSessionForMember } from '@/lib/firestore';
+import { getPracticeSessions, getMyRSVP, getNumberRosters, getUser, isSessionForMember } from '@/lib/api';
 import CalendarView from '@/components/CalendarView';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];

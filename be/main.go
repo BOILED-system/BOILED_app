@@ -45,7 +45,7 @@ func main() {
 	}
 	defer firestoreClient.Close()
 
-	// Initialize repositories (infra layer)
+	// Initialize repositories (infra layer) — existing
 	circleRepo := firestoreRepo.NewCircleRepository(firestoreClient)
 	membershipRepo := firestoreRepo.NewMembershipRepository(firestoreClient)
 	eventRepo := firestoreRepo.NewEventRepository(firestoreClient)
@@ -59,10 +59,19 @@ func main() {
 	practiceSessionRepo := firestoreRepo.NewPracticeSessionRepository(firestoreClient)
 	practiceRSVPRepo := firestoreRepo.NewPracticeRSVPRepository(firestoreClient)
 
+	// Initialize FE-compatible repositories (infra layer)
+	feUserRepo := firestoreRepo.NewFEUserRepository(firestoreClient)
+	fePracticeSessionRepo := firestoreRepo.NewFEPracticeSessionRepository(firestoreClient)
+	fePracticeRSVPRepo := firestoreRepo.NewFEPracticeRSVPRepository(firestoreClient)
+	feRosterRepo := firestoreRepo.NewNumberRosterRepository(firestoreClient)
+	feEventRepo := firestoreRepo.NewFEEventRepository(firestoreClient)
+	feSettlementRepo := firestoreRepo.NewFESettlementRepository(firestoreClient)
+	fePaymentRepo := firestoreRepo.NewFEPaymentRepository(firestoreClient)
+
 	// Initialize AI service (infra layer)
 	aiService := gemini.NewAIService(geminiAPIKey)
 
-	// Initialize interactors (usecase layer)
+	// Initialize interactors (usecase layer) — existing
 	circleInteractor := usecase.NewCircleInteractor(circleRepo, membershipRepo, userRepo)
 	eventInteractor := usecase.NewEventInteractor(eventRepo)
 	announcementInteractor := usecase.NewAnnouncementInteractor(announcementRepo)
@@ -72,7 +81,13 @@ func main() {
 	userInteractor := usecase.NewUserInteractor(userRepo)
 	practiceUseCase := usecase.NewPracticeUseCase(practiceCategoryRepo, practiceSeriesRepo, practiceSessionRepo, practiceRSVPRepo, settlementRepo)
 
-	// Initialize handlers (adapter layer)
+	// Initialize FE-compatible interactor (usecase layer)
+	feInteractor := usecase.NewFEInteractor(
+		feUserRepo, fePracticeSessionRepo, fePracticeRSVPRepo,
+		feRosterRepo, feEventRepo, feSettlementRepo, fePaymentRepo,
+	)
+
+	// Initialize handlers (adapter layer) — existing
 	circleHandler := handler.NewCircleHandler(circleInteractor)
 	eventHandler := handler.NewEventHandler(eventInteractor)
 	announcementHandler := handler.NewAnnouncementHandler(announcementInteractor)
@@ -82,7 +97,10 @@ func main() {
 	userHandler := handler.NewUserHandler(userInteractor)
 	practiceHandler := handler.NewPracticeHandler(practiceUseCase)
 
-	// Setup router
+	// Initialize FE-compatible handler (adapter layer)
+	feHandler := handler.NewFEHandler(feInteractor)
+
+	// Setup router — existing routes
 	mux := router.Setup(
 		circleHandler,
 		eventHandler,
@@ -93,6 +111,9 @@ func main() {
 		userHandler,
 		practiceHandler,
 	)
+
+	// Setup FE-compatible routes under /api prefix
+	router.SetupFE(mux, feHandler)
 
 	// Setup CORS
 	c := cors.New(cors.Options{

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { getEvent, deleteEvent, BoiledEvent } from '@/lib/firestore';
+import { getEvent, deleteEvent } from '@/lib/api';
+import type { BoiledEvent } from '@/lib/api';
 
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 

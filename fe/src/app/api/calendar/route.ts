@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAzngGng0ZJ4VZyM7l9dc9Jp0T1zP2P6LM",
-  authDomain: "boiled-app-bb43e.firebaseapp.com",
-  projectId: "boiled-app-bb43e",
-  storageBucket: "boiled-app-bb43e.firebasestorage.app",
-  messagingSenderId: "742645927524",
-  appId: "1:742645927524:web:d2c9d30742b400e96c9971",
-};
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 function toICalDate(dateStr: string) {
   return dateStr.replace(/-/g, '');
@@ -20,10 +11,12 @@ export async function GET(req: NextRequest) {
   const genre = searchParams.get('genre'); // 例: Hiphop
   const generation = searchParams.get('generation'); // 例: 16
 
-  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const snap = await getDocs(collection(db, 'practiceSessions'));
-  let sessions = snap.docs.map(d => d.data());
+  // Fetch practice sessions from Go backend API
+  const res = await fetch(`${API_BASE}/api/practice-sessions`);
+  if (!res.ok) {
+    return new NextResponse('Failed to fetch practice sessions', { status: 500 });
+  }
+  let sessions: any[] = await res.json();
 
   // ジャンルでフィルタ
   if (genre) {

@@ -12,6 +12,8 @@ import {
   getNumberRosters,
   getAllUsers,
   getUser,
+} from '@/lib/api';
+import type {
   Settlement,
   PaymentRecord,
   PaymentStatus,
@@ -19,7 +21,7 @@ import {
   CashCollector,
   NumberRoster,
   TargetType,
-} from '@/lib/firestore';
+} from '@/lib/api';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 const GENERATIONS = [16, 17];

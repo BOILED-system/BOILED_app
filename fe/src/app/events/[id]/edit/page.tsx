@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getEvent, updateEvent, TimetableRow } from '@/lib/firestore';
+import { getEvent, updateEvent } from '@/lib/api';
+import type { TimetableRow } from '@/lib/api';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 

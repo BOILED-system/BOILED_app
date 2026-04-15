@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUser } from "@/lib/firestore";
+import { getUser } from "@/lib/api";
 
 export default function Home() {
   const [memberId, setMemberId] = useState("");

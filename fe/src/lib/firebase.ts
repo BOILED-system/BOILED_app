@@ -1,5 +1,4 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -12,5 +11,7 @@ const firebaseConfig = {
 };
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// Note: Firestore is no longer used directly from the frontend.
+// All data access goes through the Go backend API (see lib/api.ts).
+// Firebase is retained only for Storage (image uploads).
 export const storage = getStorage(app);

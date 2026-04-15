@@ -8,8 +8,8 @@ import {
   updateNumberRoster,
   deleteNumberRoster,
   getUser,
-  NumberRoster,
-} from '@/lib/firestore';
+} from '@/lib/api';
+import type { NumberRoster } from '@/lib/api';
 
 export default function NumbersPage() {
   const [rosters, setRosters] = useState<NumberRoster[]>([]);

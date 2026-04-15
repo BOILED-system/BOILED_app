@@ -1,0 +1,194 @@
+package usecase
+
+import (
+	"context"
+	"time"
+
+	"github.com/noa/circle-app/api/domain"
+	"github.com/noa/circle-app/api/usecase/port"
+)
+
+// FEInteractor handles all FE-compatible operations.
+type FEInteractor struct {
+	userRepo       port.FEUserRepository
+	sessionRepo    port.FEPracticeSessionRepository
+	rsvpRepo       port.FEPracticeRSVPRepository
+	rosterRepo     port.NumberRosterRepository
+	eventRepo      port.FEEventRepository
+	settlementRepo port.FESettlementRepository
+	paymentRepo    port.FEPaymentRepository
+}
+
+func NewFEInteractor(
+	userRepo port.FEUserRepository,
+	sessionRepo port.FEPracticeSessionRepository,
+	rsvpRepo port.FEPracticeRSVPRepository,
+	rosterRepo port.NumberRosterRepository,
+	eventRepo port.FEEventRepository,
+	settlementRepo port.FESettlementRepository,
+	paymentRepo port.FEPaymentRepository,
+) *FEInteractor {
+	return &FEInteractor{
+		userRepo:       userRepo,
+		sessionRepo:    sessionRepo,
+		rsvpRepo:       rsvpRepo,
+		rosterRepo:     rosterRepo,
+		eventRepo:      eventRepo,
+		settlementRepo: settlementRepo,
+		paymentRepo:    paymentRepo,
+	}
+}
+
+// ===== Users =====
+
+func (i *FEInteractor) Login(ctx context.Context, memberID string) (*domain.FEUser, error) {
+	return i.userRepo.GetByMemberID(ctx, memberID)
+}
+
+func (i *FEInteractor) GetUser(ctx context.Context, memberID string) (*domain.FEUser, error) {
+	return i.userRepo.GetByMemberID(ctx, memberID)
+}
+
+func (i *FEInteractor) GetAllUsers(ctx context.Context) ([]*domain.FEUser, error) {
+	return i.userRepo.GetAll(ctx)
+}
+
+// ===== Practice Sessions =====
+
+func (i *FEInteractor) GetPracticeSessions(ctx context.Context) ([]*domain.FEPracticeSession, error) {
+	return i.sessionRepo.GetAll(ctx)
+}
+
+func (i *FEInteractor) GetPracticeSession(ctx context.Context, id string) (*domain.FEPracticeSession, error) {
+	return i.sessionRepo.GetByID(ctx, id)
+}
+
+func (i *FEInteractor) CreatePracticeSession(ctx context.Context, s *domain.FEPracticeSession) error {
+	return i.sessionRepo.Create(ctx, s)
+}
+
+func (i *FEInteractor) UpdatePracticeSession(ctx context.Context, id string, data map[string]interface{}) error {
+	return i.sessionRepo.Update(ctx, id, data)
+}
+
+func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) error {
+	return i.sessionRepo.Delete(ctx, id)
+}
+
+// ===== Practice RSVPs =====
+
+func (i *FEInteractor) SubmitRSVP(ctx context.Context, sessionID string, rsvp *domain.FEPracticeRSVP) error {
+	return i.rsvpRepo.Upsert(ctx, sessionID, rsvp)
+}
+
+func (i *FEInteractor) GetMyRSVP(ctx context.Context, sessionID, memberID string) (*domain.FEPracticeRSVP, error) {
+	return i.rsvpRepo.GetBySessionAndMember(ctx, sessionID, memberID)
+}
+
+func (i *FEInteractor) GetSessionRSVPs(ctx context.Context, sessionID string) ([]*domain.FEPracticeRSVP, error) {
+	return i.rsvpRepo.GetBySession(ctx, sessionID)
+}
+
+// ===== Number Rosters =====
+
+func (i *FEInteractor) GetNumberRosters(ctx context.Context) ([]*domain.NumberRoster, error) {
+	return i.rosterRepo.GetAll(ctx)
+}
+
+func (i *FEInteractor) CreateNumberRoster(ctx context.Context, r *domain.NumberRoster) error {
+	return i.rosterRepo.Create(ctx, r)
+}
+
+func (i *FEInteractor) UpdateNumberRoster(ctx context.Context, id string, data map[string]interface{}) error {
+	return i.rosterRepo.Update(ctx, id, data)
+}
+
+func (i *FEInteractor) DeleteNumberRoster(ctx context.Context, id string) error {
+	return i.rosterRepo.Delete(ctx, id)
+}
+
+// ===== Events =====
+
+func (i *FEInteractor) GetEvents(ctx context.Context) ([]*domain.FEEvent, error) {
+	return i.eventRepo.GetAll(ctx)
+}
+
+func (i *FEInteractor) GetEvent(ctx context.Context, id string) (*domain.FEEvent, error) {
+	return i.eventRepo.GetByID(ctx, id)
+}
+
+func (i *FEInteractor) CreateEvent(ctx context.Context, e *domain.FEEvent) error {
+	return i.eventRepo.Create(ctx, e)
+}
+
+func (i *FEInteractor) UpdateEvent(ctx context.Context, id string, data map[string]interface{}) error {
+	return i.eventRepo.Update(ctx, id, data)
+}
+
+func (i *FEInteractor) DeleteEvent(ctx context.Context, id string) error {
+	return i.eventRepo.Delete(ctx, id)
+}
+
+// ===== Settlements =====
+
+func (i *FEInteractor) GetSettlements(ctx context.Context) ([]*domain.FESettlement, error) {
+	return i.settlementRepo.GetAll(ctx)
+}
+
+func (i *FEInteractor) CreateSettlement(ctx context.Context, s *domain.FESettlement, payments []domain.FEPaymentRecord) error {
+	if err := i.settlementRepo.Create(ctx, s); err != nil {
+		return err
+	}
+	for _, p := range payments {
+		if err := i.paymentRepo.Create(ctx, s.ID, &p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *FEInteractor) GetSettlementPayments(ctx context.Context, settlementID string) ([]*domain.FEPaymentRecord, error) {
+	return i.paymentRepo.GetBySettlement(ctx, settlementID)
+}
+
+func (i *FEInteractor) ReportPayment(ctx context.Context, settlementID, memberID, method string, requiresConfirmation bool, cashCollectorID, cashCollectorName string) error {
+	status := "confirmed"
+	if requiresConfirmation {
+		status = "reported"
+	}
+	data := map[string]interface{}{
+		"status":         status,
+		"reportedMethod": method,
+		"reportedAt":     time.Now(),
+	}
+	if status == "confirmed" {
+		data["confirmedAt"] = time.Now()
+	} else {
+		data["confirmedAt"] = nil
+	}
+	if cashCollectorID != "" {
+		data["cashCollectorId"] = cashCollectorID
+		data["cashCollectorName"] = cashCollectorName
+	}
+	return i.paymentRepo.Update(ctx, settlementID, memberID, data)
+}
+
+func (i *FEInteractor) UpdatePaymentStatus(ctx context.Context, settlementID, memberID, status string) error {
+	data := map[string]interface{}{
+		"status": status,
+	}
+	if status == "confirmed" {
+		data["confirmedAt"] = time.Now()
+	} else {
+		data["confirmedAt"] = nil
+	}
+	return i.paymentRepo.Update(ctx, settlementID, memberID, data)
+}
+
+func (i *FEInteractor) UpdateSettlement(ctx context.Context, id string, data map[string]interface{}) error {
+	return i.settlementRepo.Update(ctx, id, data)
+}
+
+func (i *FEInteractor) DeleteSettlement(ctx context.Context, id string) error {
+	return i.settlementRepo.Delete(ctx, id)
+}

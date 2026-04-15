@@ -8,9 +8,8 @@ import {
   getSessionRSVPs,
   submitRSVP,
   getUser,
-  PracticeSession,
-  PracticeRSVP,
-} from '@/lib/firestore';
+} from '@/lib/api';
+import type { PracticeSession, PracticeRSVP } from '@/lib/api';
 
 const STATUS_LABELS: Record<string, string> = {
   GO: '出席',

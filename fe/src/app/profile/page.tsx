@@ -6,9 +6,8 @@ import {
   getUser,
   getUpcomingUnregisteredSessions,
   getMyUnpaidSettlements,
-  PracticeSession,
-  Settlement,
-} from "@/lib/firestore";
+} from "@/lib/api";
+import type { PracticeSession, Settlement } from "@/lib/api";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<{
