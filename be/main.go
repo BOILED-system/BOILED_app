@@ -25,7 +25,8 @@ func main() {
 		projectID = os.Getenv("GCP_PROJECT")
 	}
 	if projectID == "" {
-		log.Fatal("GCP_PROJECT_ID or GCP_PROJECT environment variable is required")
+		// Cloud Run 等のGCP環境では自動取得させる
+		projectID = firestore.DetectProjectID
 	}
 
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
