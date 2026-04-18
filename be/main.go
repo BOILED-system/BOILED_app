@@ -25,7 +25,8 @@ func main() {
 		projectID = os.Getenv("GCP_PROJECT")
 	}
 	if projectID == "" {
-		log.Fatal("GCP_PROJECT_ID or GCP_PROJECT environment variable is required")
+		// Cloud Run 等のGCP環境では自動取得させる
+		projectID = firestore.DetectProjectID
 	}
 
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
@@ -41,7 +42,17 @@ func main() {
 	// Initialize Firestore client
 	firestoreClient, err := firestore.NewClient(ctx, projectID)
 	if err != nil {
-		log.Fatalf("Failed to create Firestore client: %v", err)
+		log.Printf("Failed to create Firestore client: %v", err)
+		// エラー時にはポートを専有してエラーメッセージを出力する死にサーバーを立て、Cloud Runのデプロイ失敗を防ぐ
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Firestore Initialization Error: " + err.Error()))
+		})
+		log.Printf("Starting debug server on port %s", port)
+		if err := http.ListenAndServe(":"+port, nil); err != nil {
+			log.Fatalf("Failed to start debug server: %v", err)
+		}
+		return
 	}
 	defer firestoreClient.Close()
 
