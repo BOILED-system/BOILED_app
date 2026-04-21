@@ -20,10 +20,9 @@ const addTwoHours = (time: string): string => {
 
 const EMPTY_FORM = {
   name: '',
-  schedules: [{ date: '', startTime: '19:00', endTime: '21:00' }],
-  location: '',
+  schedules: [{ date: '', startTime: '19:00', endTime: '21:00', location: '' }],
   note: '',
-  type: 'regular' as 'regular' | 'event',
+  type: 'regular' as 'regular' | 'event' | 'team',
   targetType: 'genre_generation' as TargetType,
   targetGenres: [] as string[],
   targetGenerations: [] as number[],
@@ -71,14 +70,14 @@ export default function PracticesPage() {
   };
 
   const handleCreate = async () => {
-    if (!form.name || !form.location) { alert('練習名・場所は必須です'); return; }
+    if (!form.name) { alert('練習名は必須です'); return; }
     const validSchedules = form.schedules.filter(s => s.date && s.startTime);
     if (validSchedules.length === 0) { alert('少なくとも1つの有効な日程（日付・開始時間）を追加してください'); return; }
     if (form.targetType === 'number' && !form.targetNumberId) { alert('ナンバー名簿を選択してください'); return; }
     
     setIsCreating(true);
     await Promise.all(validSchedules.map(sch => createPracticeSession({ 
-      ...form, date: sch.date, startTime: sch.startTime, endTime: sch.endTime 
+      ...form, date: sch.date, startTime: sch.startTime, endTime: sch.endTime, location: sch.location 
     })));
     
     setShowForm(false);
@@ -225,10 +224,10 @@ export default function PracticesPage() {
           <p className="text-xs font-bold text-white/40 uppercase tracking-wider">新規練習プロジェクトの作成</p>
 
           <div className="flex gap-2">
-            {(['regular', 'event'] as const).map(t => (
+            {(['regular', 'event', 'team'] as const).map(t => (
               <button key={t} type="button" onClick={() => setForm(f => ({ ...f, type: t }))}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${form.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
-                {t === 'regular' ? '正規練' : 'イベント練'}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${form.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : t === 'event' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-purple-500/20 text-purple-400 border-purple-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
+                {t === 'regular' ? '正規練' : t === 'event' ? 'イベント練' : 'チーム練'}
               </button>
             ))}
           </div>
@@ -237,38 +236,41 @@ export default function PracticesPage() {
             className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50" />
 
           <div className="space-y-3 bg-black/20 p-4 rounded-lg border border-white/[0.04]">
-            <label className="text-[11px] text-white/30 block mb-1">【複数の日程を一括追加】</label>
+            <label className="text-[11px] text-white/30 block mb-1">【日程・場所の一括追加】</label>
             {form.schedules.map((sch, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <div className="flex-1">
-                  <input type="date" value={sch.date} onChange={e => {
-                    const next = [...form.schedules]; next[i].date = e.target.value; setForm({ ...form, schedules: next });
-                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+              <div key={i} className="flex flex-col gap-2 items-start border-b border-white/[0.04] pb-3 last:border-0 last:pb-0 mb-3">
+                <div className="flex gap-2 w-full items-start">
+                  <div className="flex-1">
+                    <input type="date" value={sch.date} onChange={e => {
+                      const next = [...form.schedules]; next[i].date = e.target.value; setForm({ ...form, schedules: next });
+                    }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                  </div>
+                  <div className="w-[80px]">
+                    <input type="time" value={sch.startTime} onChange={e => {
+                      const next = [...form.schedules]; next[i].startTime = e.target.value; next[i].endTime = addTwoHours(e.target.value); setForm({ ...form, schedules: next });
+                    }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                  </div>
+                  <span className="text-white/30 pt-2">〜</span>
+                  <div className="w-[80px]">
+                    <input type="time" value={sch.endTime} onChange={e => {
+                      const next = [...form.schedules]; next[i].endTime = e.target.value; setForm({ ...form, schedules: next });
+                    }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                  </div>
+                  {form.schedules.length > 1 && (
+                    <button onClick={() => setForm({ ...form, schedules: form.schedules.filter((_, idx) => idx !== i) })} className="pt-2 px-1 text-white/20 hover:text-red-400">×</button>
+                  )}
                 </div>
-                <div className="w-[80px]">
-                  <input type="time" value={sch.startTime} onChange={e => {
-                    const next = [...form.schedules]; next[i].startTime = e.target.value; next[i].endTime = addTwoHours(e.target.value); setForm({ ...form, schedules: next });
-                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                <div className="w-full">
+                  <input type="text" placeholder="場所（例：マイスタ4B） / 任意" value={sch.location} onChange={e => {
+                    const next = [...form.schedules]; next[i].location = e.target.value; setForm({ ...form, schedules: next });
+                  }} className="w-full bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500/50" />
                 </div>
-                <span className="text-white/30 pt-2">〜</span>
-                <div className="w-[80px]">
-                  <input type="time" value={sch.endTime} onChange={e => {
-                    const next = [...form.schedules]; next[i].endTime = e.target.value; setForm({ ...form, schedules: next });
-                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
-                </div>
-                {form.schedules.length > 1 && (
-                  <button onClick={() => setForm({ ...form, schedules: form.schedules.filter((_, idx) => idx !== i) })} className="pt-2 px-1 text-white/20 hover:text-red-400">×</button>
-                )}
               </div>
             ))}
-            <button onClick={() => setForm({ ...form, schedules: [...form.schedules, { date: '', startTime: '19:00', endTime: '21:00' }] })} className="text-xs font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-2 rounded-lg w-full transition-colors mt-2">
+            <button onClick={() => setForm({ ...form, schedules: [...form.schedules, { date: '', startTime: '19:00', endTime: '21:00', location: '' }] })} className="text-xs font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-2 rounded-lg w-full transition-colors mt-2">
               + 別の日程枠を追加
             </button>
           </div>
-
-          <input type="text" placeholder="場所（プロジェクト全体で共通）" value={form.location}
-            onChange={e => setForm({ ...form, location: e.target.value })}
-            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50" />
 
           <textarea placeholder="メモ（任意）" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })}
             className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none resize-none" rows={2} />
@@ -298,7 +300,7 @@ export default function PracticesPage() {
                 <div className="w-full flex flex-col justify-between p-5 min-h-[110px]">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      {hasEvent ? <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span> : <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>}
+                      {groupSessions.some(s => s.type === 'event') ? <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span> : groupSessions.some(s => s.type === 'team') ? <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">チーム練</span> : <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>}
                       <span className="text-xs font-bold text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded-full">{groupSessions.length}件の日程</span>
                     </div>
                     <h3 className="text-lg font-bold text-white truncate group-hover:text-blue-200 transition-colors">{groupName}</h3>

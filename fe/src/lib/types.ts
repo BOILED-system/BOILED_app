@@ -33,7 +33,7 @@ export interface PracticeSession {
   endTime: string;
   location: string;
   note: string;
-  type: 'regular' | 'event';
+  type: 'regular' | 'event' | 'team';
   targetType: TargetType;
   targetGenres: string[];
   targetGenerations: number[];

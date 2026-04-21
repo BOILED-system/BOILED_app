@@ -32,7 +32,7 @@ const addTwoHours = (time: string): string => {
 
 const EMPTY_FORM = {
   name: '', date: '', startTime: '', endTime: '', location: '', note: '',
-  type: 'regular' as 'regular' | 'event', targetType: 'genre_generation' as TargetType,
+  type: 'regular' as 'regular' | 'event' | 'team', targetType: 'genre_generation' as TargetType,
   targetGenres: [] as string[], targetGenerations: [] as number[],
   targetNumberId: '', targetMemberIds: [] as string[],
 };

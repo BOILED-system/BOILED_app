@@ -45,7 +45,7 @@ export default function PracticeDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '', date: '', startTime: '', endTime: '', location: '', note: '',
-    type: 'regular' as 'regular' | 'event',
+    type: 'regular' as 'regular' | 'event' | 'team',
     targetType: 'genre_generation' as TargetType,
     targetGenres: [] as string[],
     targetGenerations: [] as number[],
@@ -218,9 +218,11 @@ export default function PracticeDetailPage() {
       <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-2">
           {session.type === 'event' ? (
-            <span className="text-[10px] px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span>
+          ) : session.type === 'team' ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">チーム練</span>
           ) : (
-            <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>
           )}
         </div>
         <h1 className="text-lg font-bold text-white">{session.name}</h1>
@@ -315,10 +317,10 @@ export default function PracticeDetailPage() {
             <h2 className="text-base font-bold text-white">練習を編集</h2>
 
             <div className="flex gap-2">
-              {(['regular', 'event'] as const).map(t => (
+              {(['regular', 'event', 'team'] as const).map(t => (
                 <button key={t} onClick={() => setEditForm(f => ({ ...f, type: t }))}
-                  className={`flex-1 py-2 text-xs rounded-lg border transition-colors ${editForm.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
-                  {t === 'regular' ? '正規練' : 'イベント練'}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${editForm.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : t === 'event' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-purple-500/20 text-purple-400 border-purple-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
+                  {t === 'regular' ? '正規練' : t === 'event' ? 'イベント練' : 'チーム練'}
                 </button>
               ))}
             </div>
