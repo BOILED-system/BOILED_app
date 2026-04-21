@@ -403,6 +403,28 @@ export default function PaymentsPage() {
     );
   }
 
+  // Compute primary target set for smart dropdown filtering
+  const primaryTargetIds: Set<string> | null = (() => {
+    if (form.targetType === 'number' && form.targetNumberId) {
+      const roster = numberRosters.find(r => r.id === form.targetNumberId);
+      if (roster) return new Set(roster.memberIds);
+    }
+    if (form.targetType === 'genre_generation') {
+      return new Set(
+        allUsers
+          .filter(u => {
+            const genreOk = !form.targetGenres.length || form.targetGenres.includes(u.genre as string);
+            const genOk = !form.targetGenerations.length || form.targetGenerations.includes(u.generation as number);
+            return genreOk && genOk;
+          })
+          .map(u => u.memberId)
+      );
+    }
+    return null;
+  })();
+  const usersForAdditional = primaryTargetIds ? allUsers.filter(u => !primaryTargetIds.has(u.memberId)) : allUsers;
+  const usersForExcluded = primaryTargetIds ? allUsers.filter(u => primaryTargetIds.has(u.memberId)) : allUsers;
+
   // ===== Creator status chip helper =====
   const creatorStatusChip = (payment: PaymentRecord, settlementId: string) => {
     const key = `${settlementId}_${payment.memberId}`;
@@ -614,7 +636,7 @@ export default function PaymentsPage() {
               <label className="text-[11px] text-white/30 block">+ 追加でメンバーを固定指定（任意）</label>
               <p className="text-[10px] text-white/20">上記の条件に加え、特定のメンバーを個別に追加できます。</p>
               <MemberSelectDropdown
-                allUsers={allUsers}
+                allUsers={usersForAdditional}
                 selected={extraMembers}
                 onAdd={handleAddExtra}
                 onRemove={handleRemoveExtra}
@@ -628,7 +650,7 @@ export default function PaymentsPage() {
               <label className="text-[11px] text-white/30 block">除外するメンバー（任意）</label>
               <p className="text-[10px] text-white/20">上記の条件に該当していても、このメンバーは対象から外れます。</p>
               <MemberSelectDropdown
-                allUsers={allUsers}
+                allUsers={usersForExcluded}
                 selected={excludedMembers}
                 onAdd={handleAddExcluded}
                 onRemove={handleRemoveExcluded}
