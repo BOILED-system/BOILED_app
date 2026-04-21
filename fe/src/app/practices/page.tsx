@@ -29,6 +29,7 @@ const EMPTY_FORM = {
   targetNumberId: '',
   targetMemberIds: [] as string[],
   additionalMemberIds: [] as string[],
+  excludedMemberIds: [] as string[],
 };
 
 export default function PracticesPage() {
@@ -52,6 +53,12 @@ export default function PracticesPage() {
   const [extraMemberInput, setExtraMemberInput] = useState('');
   const [extraMemberError, setExtraMemberError] = useState('');
   const [extraMemberLoading, setExtraMemberLoading] = useState(false);
+
+  // 除外メンバー
+  const [excludedMembers, setExcludedMembers] = useState<{ id: string; name: string }[]>([]);
+  const [excludedMemberInput, setExcludedMemberInput] = useState('');
+  const [excludedMemberError, setExcludedMemberError] = useState('');
+  const [excludedMemberLoading, setExcludedMemberLoading] = useState(false);
 
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'member';
@@ -94,6 +101,8 @@ export default function PracticesPage() {
     setMemberInput('');
     setAddedExtraMembers([]);
     setExtraMemberInput('');
+    setExcludedMembers([]);
+    setExcludedMemberInput('');
     setIsCreating(false);
     load(memberId, userRole);
   };
@@ -132,10 +141,27 @@ export default function PracticesPage() {
     setForm(f => ({ ...f, additionalMemberIds: f.additionalMemberIds.filter(mid => mid !== id) }));
   };
 
+  const handleAddExcludedMember = async () => {
+    const id = excludedMemberInput.trim();
+    if (!id) return;
+    if (excludedMembers.find(m => m.id === id)) { setExcludedMemberError('すでに追加されています'); return; }
+    setExcludedMemberLoading(true); setExcludedMemberError('');
+    const user = await getUser(id);
+    setExcludedMemberLoading(false);
+    if (!user) { setExcludedMemberError('会員番号が見つかりません'); return; }
+    setExcludedMembers(prev => [...prev, { id, name: user.name as string }]);
+    setForm(f => ({ ...f, excludedMemberIds: [...f.excludedMemberIds, id] }));
+    setExcludedMemberInput('');
+  };
+  const handleRemoveExcludedMember = (id: string) => {
+    setExcludedMembers(prev => prev.filter(m => m.id !== id));
+    setForm(f => ({ ...f, excludedMemberIds: f.excludedMemberIds.filter(mid => mid !== id) }));
+  };
+
   const toggleGenre = (genre: string) => setForm(f => ({ ...f, targetGenres: f.targetGenres.includes(genre) ? f.targetGenres.filter(g => g !== genre) : [...f.targetGenres, genre] }));
   const toggleGeneration = (gen: number) => setForm(f => ({ ...f, targetGenerations: f.targetGenerations.includes(gen) ? f.targetGenerations.filter(g => g !== gen) : [...f.targetGenerations, gen] }));
 
-  const TargetForm = ({ f, setF, addedM, memberIn, setMemberIn, memberErr, memberLoading, onAddMember, onRemoveMember, onToggleGenre, onToggleGen, rosters, addedExtra, extraIn, setExtraIn, extraErr, extraLoading, onAddExtra, onRemoveExtra }: any) => (
+  const TargetForm = ({ f, setF, addedM, memberIn, setMemberIn, memberErr, memberLoading, onAddMember, onRemoveMember, onToggleGenre, onToggleGen, rosters, addedExtra, extraIn, setExtraIn, extraErr, extraLoading, onAddExtra, onRemoveExtra, excludedM, excludedIn, setExcludedIn, excludedErr, excludedLoading, onAddExcluded, onRemoveExcluded }: any) => (
     <div className="space-y-3">
       <label className="text-[11px] text-white/30 block mb-1">対象者の指定方法</label>
       <div className="space-y-1.5 mb-2">
@@ -248,6 +274,33 @@ export default function PracticesPage() {
           </div>
         )}
       </div>
+
+      {/* 除外メンバー */}
+      <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
+        <label className="text-[11px] text-white/30 block">除外するメンバー（任意）</label>
+        <p className="text-[10px] text-white/20">上記の条件に該当していても、このメンバーは対象から外れます。</p>
+        <div className="flex gap-2">
+          <input type="text" placeholder="会員番号（例：16199）" value={excludedIn}
+            onChange={e => { setExcludedIn(e.target.value); }}
+            onKeyDown={e => e.key === 'Enter' && onAddExcluded()}
+            className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none" />
+          <button type="button" onClick={onAddExcluded}
+            disabled={excludedLoading || !excludedIn.trim()}
+            className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
+            {excludedLoading ? '...' : '除外'}
+          </button>
+        </div>
+        {excludedErr && <p className="text-xs text-red-400">{excludedErr}</p>}
+        {excludedM.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {excludedM.map((m: any) => (
+              <span key={m.id} className="flex items-center gap-1 text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full">
+                {m.name} <button type="button" onClick={() => onRemoveExcluded(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -333,7 +386,9 @@ export default function PracticesPage() {
             setMemberIn={(v:string) => { setMemberInput(v); setMemberInputError(''); }} memberErr={memberInputError} memberLoading={memberInputLoading}
             onAddMember={handleAddMember} onRemoveMember={handleRemoveMember} onToggleGenre={toggleGenre} onToggleGen={toggleGeneration} rosters={numberRosters}
             addedExtra={addedExtraMembers} extraIn={extraMemberInput} setExtraIn={(v:string) => { setExtraMemberInput(v); setExtraMemberError(''); }}
-            extraErr={extraMemberError} extraLoading={extraMemberLoading} onAddExtra={handleAddExtraMember} onRemoveExtra={handleRemoveExtraMember} />
+            extraErr={extraMemberError} extraLoading={extraMemberLoading} onAddExtra={handleAddExtraMember} onRemoveExtra={handleRemoveExtraMember}
+            excludedM={excludedMembers} excludedIn={excludedMemberInput} setExcludedIn={(v:string) => { setExcludedMemberInput(v); setExcludedMemberError(''); }}
+            excludedErr={excludedMemberError} excludedLoading={excludedMemberLoading} onAddExcluded={handleAddExcludedMember} onRemoveExcluded={handleRemoveExcludedMember} />
 
           <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.08]">
             <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); }} className="text-xs font-bold px-4 py-2 text-white/40 hover:text-white/60 transition-colors">キャンセル</button>

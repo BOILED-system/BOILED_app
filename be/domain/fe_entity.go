@@ -27,6 +27,7 @@ type FEPracticeSession struct {
 	TargetNumberID    string   `json:"targetNumberId" firestore:"targetNumberId"`
 	TargetMemberIDs      []string `json:"targetMemberIds" firestore:"targetMemberIds"`
 	AdditionalMemberIDs  []string `json:"additionalMemberIds" firestore:"additionalMemberIds"`
+	ExcludedMemberIDs    []string `json:"excludedMemberIds" firestore:"excludedMemberIds"`
 	CreatedAt            any      `json:"createdAt" firestore:"createdAt"`
 }
 
@@ -81,6 +82,8 @@ type FESettlement struct {
 	TargetGenerations    []int           `json:"targetGenerations" firestore:"targetGenerations"`
 	TargetNumberID       string          `json:"targetNumberId" firestore:"targetNumberId"`
 	TargetMemberIDs      []string        `json:"targetMemberIds" firestore:"targetMemberIds"`
+	AdditionalMemberIDs  []string        `json:"additionalMemberIds" firestore:"additionalMemberIds"`
+	ExcludedMemberIDs    []string        `json:"excludedMemberIds" firestore:"excludedMemberIds"`
 	ResolvedMemberIDs    []string        `json:"resolvedMemberIds" firestore:"resolvedMemberIds"`
 	PaymentMethods       []string        `json:"paymentMethods" firestore:"paymentMethods"`
 	BankInfo             string          `json:"bankInfo" firestore:"bankInfo"`

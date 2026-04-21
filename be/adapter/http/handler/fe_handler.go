@@ -111,8 +111,10 @@ func (h *FEHandler) CreatePracticeSession(w http.ResponseWriter, r *http.Request
 		TargetType:        req.TargetType,
 		TargetGenres:      req.TargetGenres,
 		TargetGenerations: req.TargetGenerations,
-		TargetNumberID:    req.TargetNumberID,
-		TargetMemberIDs:   req.TargetMemberIDs,
+		TargetNumberID:      req.TargetNumberID,
+		TargetMemberIDs:     req.TargetMemberIDs,
+		AdditionalMemberIDs: req.AdditionalMemberIDs,
+		ExcludedMemberIDs:   req.ExcludedMemberIDs,
 	}
 	if err := h.interactor.CreatePracticeSession(r.Context(), s); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -352,6 +354,8 @@ func (h *FEHandler) CreateSettlementFE(w http.ResponseWriter, r *http.Request) {
 		TargetGenerations:    req.TargetGenerations,
 		TargetNumberID:       req.TargetNumberID,
 		TargetMemberIDs:      req.TargetMemberIDs,
+		AdditionalMemberIDs:  req.AdditionalMemberIDs,
+		ExcludedMemberIDs:    req.ExcludedMemberIDs,
 		ResolvedMemberIDs:    req.ResolvedMemberIDs,
 		PaymentMethods:       req.PaymentMethods,
 		BankInfo:             req.BankInfo,

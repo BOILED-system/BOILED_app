@@ -40,6 +40,7 @@ export interface PracticeSession {
   targetNumberId: string;
   targetMemberIds: string[];
   additionalMemberIds: string[];
+  excludedMemberIds: string[];
   createdAt: any;
 }
 
@@ -87,6 +88,8 @@ export interface Settlement {
   targetGenerations: number[];
   targetNumberId: string;
   targetMemberIds: string[];
+  additionalMemberIds: string[];
+  excludedMemberIds: string[];
   resolvedMemberIds: string[];
   paymentMethods: PaymentMethod[];
   bankInfo: string;

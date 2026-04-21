@@ -47,6 +47,8 @@ const EMPTY_FORM = {
   targetGenerations: [] as number[],
   targetNumberId: '',
   targetMemberIds: [] as string[],
+  additionalMemberIds: [] as string[],
+  excludedMemberIds: [] as string[],
   paymentMethods: [] as PaymentMethod[],
   bankInfo: '',
   paypayInfo: '',
@@ -71,6 +73,14 @@ export default function PaymentsPage() {
   const [memberInput, setMemberInput] = useState('');
   const [memberInputError, setMemberInputError] = useState('');
   const [memberInputLoading, setMemberInputLoading] = useState(false);
+  const [addedExtraMembers, setAddedExtraMembers] = useState<{ id: string; name: string }[]>([]);
+  const [extraMemberInput, setExtraMemberInput] = useState('');
+  const [extraMemberError, setExtraMemberError] = useState('');
+  const [extraMemberLoading, setExtraMemberLoading] = useState(false);
+  const [excludedMembers, setExcludedMembers] = useState<{ id: string; name: string }[]>([]);
+  const [excludedMemberInput, setExcludedMemberInput] = useState('');
+  const [excludedMemberError, setExcludedMemberError] = useState('');
+  const [excludedMemberLoading, setExcludedMemberLoading] = useState(false);
   const [cashCollectorInput, setCashCollectorInput] = useState('');
   const [cashCollectorError, setCashCollectorError] = useState('');
   const [cashCollectorLoading, setCashCollectorLoading] = useState(false);
@@ -177,6 +187,40 @@ export default function PaymentsPage() {
     setForm(f => ({ ...f, targetMemberIds: f.targetMemberIds.filter(x => x !== id) }));
   };
 
+  const handleAddExtraMember = async () => {
+    const id = extraMemberInput.trim();
+    if (!id) return;
+    if (addedExtraMembers.find(m => m.id === id)) { setExtraMemberError('すでに追加されています'); return; }
+    setExtraMemberLoading(true); setExtraMemberError('');
+    const user = await getUser(id);
+    setExtraMemberLoading(false);
+    if (!user) { setExtraMemberError('会員番号が見つかりません'); return; }
+    setAddedExtraMembers(prev => [...prev, { id, name: user.name as string }]);
+    setForm(f => ({ ...f, additionalMemberIds: [...f.additionalMemberIds, id] }));
+    setExtraMemberInput('');
+  };
+  const handleRemoveExtraMember = (id: string) => {
+    setAddedExtraMembers(prev => prev.filter(m => m.id !== id));
+    setForm(f => ({ ...f, additionalMemberIds: f.additionalMemberIds.filter(x => x !== id) }));
+  };
+
+  const handleAddExcludedMember = async () => {
+    const id = excludedMemberInput.trim();
+    if (!id) return;
+    if (excludedMembers.find(m => m.id === id)) { setExcludedMemberError('すでに追加されています'); return; }
+    setExcludedMemberLoading(true); setExcludedMemberError('');
+    const user = await getUser(id);
+    setExcludedMemberLoading(false);
+    if (!user) { setExcludedMemberError('会員番号が見つかりません'); return; }
+    setExcludedMembers(prev => [...prev, { id, name: user.name as string }]);
+    setForm(f => ({ ...f, excludedMemberIds: [...f.excludedMemberIds, id] }));
+    setExcludedMemberInput('');
+  };
+  const handleRemoveExcludedMember = (id: string) => {
+    setExcludedMembers(prev => prev.filter(m => m.id !== id));
+    setForm(f => ({ ...f, excludedMemberIds: f.excludedMemberIds.filter(x => x !== id) }));
+  };
+
   const handleAddCashCollector = async () => {
     const id = cashCollectorInput.trim();
     if (!id) return;
@@ -221,12 +265,24 @@ export default function PaymentsPage() {
         resolvedMemberIds = addedMembers.map(m => m.id);
       }
 
+      // additionalMemberIds を追加（重複除外）
+      for (const extra of addedExtraMembers) {
+        if (!resolvedMemberIds.includes(extra.id)) {
+          resolvedMemberIds = [...resolvedMemberIds, extra.id];
+          payments = [...payments, { memberId: extra.id, name: extra.name }];
+        }
+      }
+      // excludedMemberIds を除外
+      const excludedSet = new Set(form.excludedMemberIds);
+      resolvedMemberIds = resolvedMemberIds.filter(id => !excludedSet.has(id));
+      payments = payments.filter(p => !excludedSet.has(p.memberId));
+
       await createSettlement(
-        { title: form.title, amount: Number(form.amount), dueDate: form.dueDate, note: form.note, createdBy: memberId, createdByName: userName, targetType: form.targetType, targetGenres: form.targetGenres, targetGenerations: form.targetGenerations, targetNumberId: form.targetNumberId, targetMemberIds: form.targetMemberIds, resolvedMemberIds, paymentMethods: form.paymentMethods, bankInfo: form.bankInfo, paypayInfo: form.paypayInfo, cashCollectors: form.cashCollectors, requiresConfirmation: form.requiresConfirmation },
+        { title: form.title, amount: Number(form.amount), dueDate: form.dueDate, note: form.note, createdBy: memberId, createdByName: userName, targetType: form.targetType, targetGenres: form.targetGenres, targetGenerations: form.targetGenerations, targetNumberId: form.targetNumberId, targetMemberIds: form.targetMemberIds, additionalMemberIds: form.additionalMemberIds, excludedMemberIds: form.excludedMemberIds, resolvedMemberIds, paymentMethods: form.paymentMethods, bankInfo: form.bankInfo, paypayInfo: form.paypayInfo, cashCollectors: form.cashCollectors, requiresConfirmation: form.requiresConfirmation },
         payments,
       );
 
-      setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); setMemberInput(''); setCashCollectorInput('');
+      setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); setMemberInput(''); setAddedExtraMembers([]); setExtraMemberInput(''); setExcludedMembers([]); setExcludedMemberInput(''); setCashCollectorInput('');
       load(memberId);
     } finally {
       setCreating(false);
@@ -241,6 +297,7 @@ export default function PaymentsPage() {
       title: s.title, amount: String(s.amount), dueDate: s.dueDate, note: s.note ?? '',
       targetType: s.targetType, targetGenres: s.targetGenres ?? [], targetGenerations: s.targetGenerations ?? [],
       targetNumberId: s.targetNumberId ?? '', targetMemberIds: s.targetMemberIds ?? [],
+      additionalMemberIds: s.additionalMemberIds ?? [], excludedMemberIds: s.excludedMemberIds ?? [],
       paymentMethods: s.paymentMethods ?? [], bankInfo: s.bankInfo ?? '', paypayInfo: s.paypayInfo ?? '',
       cashCollectors: s.cashCollectors ?? [], requiresConfirmation: s.requiresConfirmation ?? false,
     });
@@ -593,6 +650,58 @@ export default function PaymentsPage() {
                 ) : <p className="text-xs text-white/20">まだ誰も追加されていません</p>}
               </div>
             )}
+
+            {/* 追加メンバー */}
+            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
+              <label className="text-[11px] text-white/30 block">+ 追加でメンバーを固定指定（任意）</label>
+              <p className="text-[10px] text-white/20">上記の条件に加え、特定のメンバーを個別に追加できます。</p>
+              <div className="flex gap-2">
+                <input type="text" placeholder="会員番号（例：16199）" value={extraMemberInput}
+                  onChange={e => { setExtraMemberInput(e.target.value); setExtraMemberError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleAddExtraMember()}
+                  className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none" />
+                <button onClick={handleAddExtraMember} disabled={extraMemberLoading || !extraMemberInput.trim()}
+                  className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
+                  {extraMemberLoading ? '...' : '追加'}
+                </button>
+              </div>
+              {extraMemberError && <p className="text-xs text-red-400">{extraMemberError}</p>}
+              {addedExtraMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {addedExtraMembers.map(m => (
+                    <span key={m.id} className="flex items-center gap-1 text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded-full">
+                      {m.name}<button onClick={() => handleRemoveExtraMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 除外メンバー */}
+            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
+              <label className="text-[11px] text-white/30 block">除外するメンバー（任意）</label>
+              <p className="text-[10px] text-white/20">上記の条件に該当していても、このメンバーは対象から外れます。</p>
+              <div className="flex gap-2">
+                <input type="text" placeholder="会員番号（例：16199）" value={excludedMemberInput}
+                  onChange={e => { setExcludedMemberInput(e.target.value); setExcludedMemberError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleAddExcludedMember()}
+                  className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none" />
+                <button onClick={handleAddExcludedMember} disabled={excludedMemberLoading || !excludedMemberInput.trim()}
+                  className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
+                  {excludedMemberLoading ? '...' : '除外'}
+                </button>
+              </div>
+              {excludedMemberError && <p className="text-xs text-red-400">{excludedMemberError}</p>}
+              {excludedMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {excludedMembers.map(m => (
+                    <span key={m.id} className="flex items-center gap-1 text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full">
+                      {m.name}<button onClick={() => handleRemoveExcludedMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
