@@ -91,14 +91,14 @@ type FESettlement struct {
 
 // FEPaymentRecord represents individual payment status matching frontend schema.
 type FEPaymentRecord struct {
-	MemberID           string `json:"memberId" firestore:"memberId"`
-	Name               string `json:"name" firestore:"name"`
-	Status             string `json:"status" firestore:"status"` // unpaid | reported | confirmed
-	ReportedMethod     string `json:"reportedMethod,omitempty" firestore:"reportedMethod,omitempty"`
-	CashCollectorID    string `json:"cashCollectorId,omitempty" firestore:"cashCollectorId,omitempty"`
-	CashCollectorName  string `json:"cashCollectorName,omitempty" firestore:"cashCollectorName,omitempty"`
-	ReportedAt         any    `json:"reportedAt,omitempty" firestore:"reportedAt,omitempty"`
-	ConfirmedAt        any    `json:"confirmedAt" firestore:"confirmedAt"`
+	MemberID          string `json:"memberId" firestore:"memberId"`
+	Name              string `json:"name" firestore:"name"`
+	Status            string `json:"status" firestore:"status"` // unpaid | reported | confirmed
+	ReportedMethod    string `json:"reportedMethod,omitempty" firestore:"reportedMethod,omitempty"`
+	CashCollectorID   string `json:"cashCollectorId,omitempty" firestore:"cashCollectorId,omitempty"`
+	CashCollectorName string `json:"cashCollectorName,omitempty" firestore:"cashCollectorName,omitempty"`
+	ReportedAt        any    `json:"reportedAt,omitempty" firestore:"reportedAt,omitempty"`
+	ConfirmedAt       any    `json:"confirmedAt" firestore:"confirmedAt"`
 }
 
 // TimetableRow represents a timetable entry for an event.

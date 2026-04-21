@@ -24,7 +24,7 @@ export default function Home() {
 
       localStorage.setItem("memberId", memberId);
       localStorage.setItem("userName", user.name);
-      localStorage.setItem("userRole", user.role);
+      localStorage.setItem("userRole", "admin"); // フラット権限化のため全員admin扱い
       router.push("/profile");
     } catch (e) {
       setError("ログインに失敗しました。もう一度試してください。");
