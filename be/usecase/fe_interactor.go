@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/noa/circle-app/api/domain"
+	"github.com/noa/circle-app/api/infra/discord"
 	"github.com/noa/circle-app/api/usecase/port"
 )
 
@@ -78,7 +79,32 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 // ===== Practice RSVPs =====
 
 func (i *FEInteractor) SubmitRSVP(ctx context.Context, sessionID string, rsvp *domain.FEPracticeRSVP) error {
-	return i.rsvpRepo.Upsert(ctx, sessionID, rsvp)
+	// Calculate if there was any actual change
+	oldRSVP, _ := i.rsvpRepo.GetBySessionAndMember(ctx, sessionID, rsvp.MemberID)
+	changed := true
+	if oldRSVP != nil {
+		if oldRSVP.Status == rsvp.Status && oldRSVP.Note == rsvp.Note {
+			changed = false
+		}
+	}
+
+	// Skip Firestore Upsert locally if there's no meaning in updating
+	if !changed {
+		return nil
+	}
+
+	err := i.rsvpRepo.Upsert(ctx, sessionID, rsvp)
+	if err != nil {
+		return err
+	}
+
+	// Trigger Discord webhook dynamically using goroutine
+	session, err := i.sessionRepo.GetByID(ctx, sessionID)
+	if err == nil && session != nil {
+		go discord.NotifyRSVP(context.Background(), session, rsvp)
+	}
+
+	return nil
 }
 
 func (i *FEInteractor) GetMyRSVP(ctx context.Context, sessionID, memberID string) (*domain.FEPracticeRSVP, error) {
