@@ -246,9 +246,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                     {session.location && <p className="text-xs text-white/30 mt-1">{session.location}</p>}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    <Link href={`/practices/${session.id}`} className="text-xs text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg hover:bg-blue-500/20 font-medium whitespace-nowrap">
-                      単一詳細 ➔
-                    </Link>
+
                     <button onClick={() => openEdit(session)} className="text-xs bg-white/[0.06] text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/[0.1] whitespace-nowrap">編集</button>
                     <button onClick={() => handleDelete(session)} className="text-xs bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/20 whitespace-nowrap">削除</button>
                   </div>
