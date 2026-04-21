@@ -138,6 +138,24 @@ export default function PracticesPage() {
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"/></div>;
 
+  // Compute primary target set for smart dropdown filtering
+  const primaryTargetIds: Set<string> | null = (() => {
+    if (form.targetType === 'number' && form.targetNumberId) {
+      const roster = numberRosters.find(r => r.id === form.targetNumberId);
+      if (roster) return new Set(roster.memberIds);
+    }
+    if (form.targetType === 'genre_generation' && form.targetGenres.length > 0 && form.targetGenerations.length > 0) {
+      return new Set(
+        allUsers
+          .filter(u => form.targetGenres.includes(u.genre as string) && form.targetGenerations.includes(u.generation as number))
+          .map(u => u.memberId)
+      );
+    }
+    return null;
+  })();
+  const usersForAdditional = primaryTargetIds ? allUsers.filter(u => !primaryTargetIds.has(u.memberId)) : allUsers;
+  const usersForExcluded = primaryTargetIds ? allUsers.filter(u => primaryTargetIds.has(u.memberId)) : allUsers;
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-12">
       <div className="flex items-center justify-between">
@@ -288,7 +306,7 @@ export default function PracticesPage() {
               <label className="text-[11px] text-white/30 block">+ 追加でメンバーを固定指定（任意）</label>
               <p className="text-[10px] text-white/20">上記の条件に加え、特定のメンバーを個別に追加できます。</p>
               <MemberSelectDropdown
-                allUsers={allUsers}
+                allUsers={usersForAdditional}
                 selected={extraMembers}
                 onAdd={handleAddExtra}
                 onRemove={handleRemoveExtra}
@@ -302,7 +320,7 @@ export default function PracticesPage() {
               <label className="text-[11px] text-white/30 block">除外するメンバー（任意）</label>
               <p className="text-[10px] text-white/20">上記の条件に該当していても、このメンバーは対象から外れます。</p>
               <MemberSelectDropdown
-                allUsers={allUsers}
+                allUsers={usersForExcluded}
                 selected={excludedMembers}
                 onAdd={handleAddExcluded}
                 onRemove={handleRemoveExcluded}
