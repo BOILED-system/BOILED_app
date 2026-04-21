@@ -116,6 +116,8 @@ export async function createPracticeSession(data: {
   targetGenerations: number[];
   targetNumberId: string;
   targetMemberIds: string[];
+  additionalMemberIds: string[];
+  excludedMemberIds: string[];
 }): Promise<string> {
   const result = await apiPost<PracticeSession>('/api/practice-sessions', data);
   return result.id;
@@ -285,8 +287,10 @@ export function isSessionForMember(
   generation: number,
   rosters: NumberRoster[],
 ): boolean {
-  const tt: TargetType = session.targetType || 'genre_generation';
+  if (session.excludedMemberIds?.includes(memberId)) return false;
+  if (session.additionalMemberIds?.includes(memberId)) return true;
 
+  const tt: TargetType = session.targetType || 'genre_generation';
   if (tt === 'genre_generation') {
     if (!session.targetGenres?.length && !session.targetGenerations?.length) return false;
     const genreOk = !session.targetGenres?.length || session.targetGenres.includes(genre);
@@ -300,7 +304,7 @@ export function isSessionForMember(
   if (tt === 'individual') {
     return session.targetMemberIds?.includes(memberId) ?? false;
   }
-  return true;
+  return false;
 }
 
 // ===== Composite functions (used by profile page) =====

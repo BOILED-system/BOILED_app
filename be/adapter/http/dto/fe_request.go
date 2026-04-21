@@ -16,8 +16,10 @@ type CreatePracticeSessionFERequest struct {
 	TargetType        string   `json:"targetType"`
 	TargetGenres      []string `json:"targetGenres"`
 	TargetGenerations []int    `json:"targetGenerations"`
-	TargetNumberID    string   `json:"targetNumberId"`
-	TargetMemberIDs   []string `json:"targetMemberIds"`
+	TargetNumberID      string   `json:"targetNumberId"`
+	TargetMemberIDs     []string `json:"targetMemberIds"`
+	AdditionalMemberIDs []string `json:"additionalMemberIds"`
+	ExcludedMemberIDs   []string `json:"excludedMemberIds"`
 }
 
 type SubmitRSVPFERequest struct {
@@ -67,6 +69,8 @@ type CreateSettlementFERequest struct {
 	TargetGenerations    []int                 `json:"targetGenerations"`
 	TargetNumberID       string                `json:"targetNumberId"`
 	TargetMemberIDs      []string              `json:"targetMemberIds"`
+	AdditionalMemberIDs  []string              `json:"additionalMemberIds"`
+	ExcludedMemberIDs    []string              `json:"excludedMemberIds"`
 	ResolvedMemberIDs    []string              `json:"resolvedMemberIds"`
 	PaymentMethods       []string              `json:"paymentMethods"`
 	BankInfo             string                `json:"bankInfo"`
