@@ -259,7 +259,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                       <button
                         key={s}
                         onClick={() => handleBulkRSVPChange(session.id, s, note)}
-                        className={`flex-1 py-2 text-[13px] font-bold rounded-lg border transition-colors \${status === s ? STATUS_COLORS[s] : 'bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08]'}`}
+                        className={`flex-1 py-2 text-[13px] font-bold rounded-lg border transition-colors ${status === s ? STATUS_COLORS[s] : 'bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08]'}`}
                       >
                         {STATUS_LABELS[s]}
                       </button>
