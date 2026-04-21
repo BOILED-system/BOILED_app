@@ -11,6 +11,7 @@ import {
   getNumberRosters,
   getUser,
   isSessionForMember,
+  submitRSVP,
 } from '@/lib/api';
 import type { PracticeSession, NumberRoster, TargetType } from '@/lib/api';
 
@@ -48,8 +49,11 @@ const EMPTY_FORM = {
 
 export default function PracticesPage() {
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
-  const [myRSVPs, setMyRSVPs] = useState<Record<string, string>>({});
+  const [myRSVPs, setMyRSVPs] = useState<Record<string, { status: string; note: string }>>({});
   const [loading, setLoading] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [editingRSVPs, setEditingRSVPs] = useState<Record<string, { status: string; note: string }>>({});
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [memberId, setMemberId] = useState('');
@@ -91,18 +95,14 @@ export default function PracticesPage() {
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
 
-      const filtered = role === 'admin'
-        ? allSessions
-        : allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
-
-      const sorted = filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const sorted = allSessions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setSessions(sorted);
 
       if (mid) {
-        const rsvpMap: Record<string, string> = {};
+        const rsvpMap: Record<string, { status: string; note: string }> = {};
         await Promise.all(sorted.map(async s => {
           const rsvp = await getMyRSVP(s.id, mid);
-          if (rsvp) rsvpMap[s.id] = rsvp.status;
+          if (rsvp) rsvpMap[s.id] = { status: rsvp.status, note: rsvp.note || '' };
         }));
         setMyRSVPs(rsvpMap);
       }
@@ -112,6 +112,58 @@ export default function PracticesPage() {
       setLoading(false);
     }
   };
+
+  // ===== 一括保存ロジック =====
+
+  const toggleGroup = (name: string) => setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
+  
+  const handleBulkRSVPChange = (sessionId: string, status: string, note: string) => {
+    setEditingRSVPs(prev => ({ ...prev, [sessionId]: { status, note } }));
+  };
+
+  const saveBulkRSVPs = async (groupName: string, groupSessions: PracticeSession[]) => {
+    const changedSessionIds = groupSessions.map(s => s.id).filter(id => editingRSVPs[id]);
+    if (changedSessionIds.length === 0) return;
+
+    setBulkSaving(true);
+    try {
+      const user = await getUser(memberId);
+      if (!user) return;
+      await Promise.all(changedSessionIds.map(id => 
+        submitRSVP({
+          sessionId: id,
+          memberId: memberId,
+          name: user.name,
+          genre: user.genre,
+          generation: user.generation,
+          status: editingRSVPs[id].status as any,
+          note: editingRSVPs[id].note,
+        })
+      ));
+      setMyRSVPs(prev => {
+        const next = { ...prev };
+        changedSessionIds.forEach(id => { next[id] = editingRSVPs[id]; });
+        return next;
+      });
+      setEditingRSVPs(prev => {
+        const next = { ...prev };
+        changedSessionIds.forEach(id => delete next[id]);
+        return next;
+      });
+      alert('一括保存しました');
+    } catch (e) {
+      console.error(e);
+      alert('保存に失敗しました');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const groupedSessions = sessions.reduce((acc, session) => {
+    if (!acc[session.name]) acc[session.name] = [];
+    acc[session.name].push(session);
+    return acc;
+  }, {} as Record<string, PracticeSession[]>);
 
   // ===== 作成 =====
 
@@ -347,18 +399,16 @@ export default function PracticesPage() {
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-white">練習</h1>
-        {userRole === 'admin' && (
-          <div className="flex gap-2">
-            <Link href="/numbers"
-              className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
-              名簿管理
-            </Link>
-            <button onClick={() => setShowForm(!showForm)}
-              className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors">
-              + 練習を追加
-            </button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Link href="/numbers"
+            className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
+            名簿管理
+          </Link>
+          <button onClick={() => setShowForm(!showForm)}
+            className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors">
+            + 練習を追加
+          </button>
+        </div>
       </div>
 
       {/* 作成フォーム */}
@@ -433,78 +483,107 @@ export default function PracticesPage() {
       {sessions.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-white/30 text-sm">練習がまだありません</p>
-          {userRole === 'admin' && <p className="text-white/20 text-xs mt-1">「+ 練習を追加」から作成してください</p>}
+          <p className="text-white/20 text-xs mt-1">「+ 練習を追加」から作成してください</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {sessions.map(session => {
-            const myStatus = myRSVPs[session.id];
-            return (
-              <div key={session.id} className="bg-white/[0.04] border border-white/[0.06] rounded-xl overflow-hidden">
-                <Link href={`/practices/${session.id}`}
-                  className="block p-4 hover:bg-white/[0.06] transition-colors group">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {session.type === 'event' ? (
-                          <span className="text-[10px] px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span>
-                        ) : (
-                          <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>
-                        )}
-                      </div>
-                      <h3 className="text-sm font-medium text-white truncate">{session.name}</h3>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-xs text-white/40">{session.date} {session.startTime}{session.endTime ? `〜${session.endTime}` : ''}</span>
-                        {session.location && <span className="text-xs text-white/30 truncate">{session.location}</span>}
-                      </div>
-                      <div className="flex gap-1 mt-2 flex-wrap">
-                        {(!session.targetType || session.targetType === 'genre_generation') && (
-                          <>
-                            {session.targetGenres?.map(g => (
-                              <span key={g} className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">{g}</span>
-                            ))}
-                            {session.targetGenerations?.map(g => (
-                              <span key={g} className="text-[10px] px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">{g}代</span>
-                            ))}
-                          </>
-                        )}
-                        {session.targetType === 'number' && (
-                          <span className="text-[10px] px-2 py-0.5 bg-teal-500/20 text-teal-300 rounded-full">
-                            {numberRosters.find(r => r.id === session.targetNumberId)?.name || 'ナンバー名簿'}
-                          </span>
-                        )}
-                        {session.targetType === 'individual' && (
-                          <span className="text-[10px] px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded-full">
-                            個別指定 {session.targetMemberIds?.length || 0}人
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="ml-4 flex-shrink-0">
-                      {myStatus ? (
-                        <span className={`text-[11px] px-2.5 py-1 rounded-full ${STATUS_COLORS[myStatus]}`}>
-                          {STATUS_LABELS[myStatus]}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/[0.04] text-white/20 border border-white/[0.06]">
-                          未登録
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
+        <div className="space-y-4">
+          {Object.entries(groupedSessions).map(([groupName, groupSessions]) => {
+            const isExpanded = expandedGroups[groupName];
+            const hasEvent = groupSessions.some(s => s.type === 'event');
 
-                {/* Admin: 編集・削除 */}
-                {userRole === 'admin' && (
-                  <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/[0.04]">
-                    <button onClick={() => openEdit(session)}
-                      className="text-xs text-white/30 hover:text-blue-400 transition-colors">
-                      編集
-                    </button>
-                    <button onClick={() => handleDelete(session)}
-                      className="text-xs text-white/20 hover:text-red-400 transition-colors">
-                      削除
-                    </button>
+            return (
+              <div key={groupName} className="bg-white/[0.04] border border-white/[0.06] rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleGroup(groupName)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/[0.06] transition-colors text-left"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      {hasEvent ? (
+                        <span className="text-[10px] px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練含</span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>
+                      )}
+                      <span className="text-xs text-white/40">{groupSessions.length}件の日程</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white truncate">{groupName}</h3>
+                  </div>
+                  <div className="text-white/30 text-sm font-medium">
+                    {isExpanded ? '▲ 閉じる' : '▼ 展開する'}
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-white/[0.06] p-4 bg-[#141824] space-y-4">
+                    {/* CSVエクスポートボタン領域 */}
+                    <div className="flex justify-between items-center bg-white/[0.02] p-3 rounded-lg border border-white/[0.04] mb-2">
+                      <span className="text-xs text-white/50">プロジェクト全体の出欠状況（Excel出力可）</span>
+                      <Link href={`/practices/group/${encodeURIComponent(groupName)}`} className="text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-3 py-1.5 rounded-lg transition-colors border border-emerald-500/30 font-bold whitespace-nowrap">
+                        📋 出欠一覧・CSV出力
+                      </Link>
+                    </div>
+
+                    {groupSessions.map((session, index) => {
+                      const currentRSVP = myRSVPs[session.id];
+                      const editedRSVP = editingRSVPs[session.id];
+                      const status = editedRSVP?.status || currentRSVP?.status || '';
+                      const note = editedRSVP?.note ?? (currentRSVP?.note || '');
+
+                      return (
+                        <div key={session.id} className={`${index > 0 ? 'border-t border-white/[0.04] pt-4' : ''}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <p className="text-sm font-medium text-white">{session.date} <span className="text-white/60 text-xs ml-2">{session.startTime}{session.endTime ? `〜${session.endTime}` : ''}</span></p>
+                              {session.location && <p className="text-xs text-white/30 mt-0.5">{session.location}</p>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Link href={`/practices/${session.id}`} className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded hover:bg-blue-500/20 mr-2">詳細/参加状況 ➔</Link>
+                              
+                              <div className="flex items-center gap-3">
+                                {/* 編集・削除 */}
+                                <button onClick={() => openEdit(session)} className="text-xs text-white/30 hover:text-blue-400">編集</button>
+                                <button onClick={() => handleDelete(session)} className="text-xs text-white/20 hover:text-red-400">削除</button>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* 出欠入力UI */}
+                          <div className="flex flex-col gap-2 mt-3">
+                            <div className="flex gap-2">
+                              {(['GO', 'NO', 'LATE', 'EARLY']).map(s => (
+                                <button
+                                  key={s}
+                                  onClick={() => handleBulkRSVPChange(session.id, s, note)}
+                                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border transition-colors ${status === s ? STATUS_COLORS[s] : 'bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08]'}`}
+                                >
+                                  {STATUS_LABELS[s]}
+                                </button>
+                              ))}
+                            </div>
+                            {(status === 'LATE' || status === 'EARLY' || status === 'NO') && (
+                              <input
+                                type="text"
+                                placeholder={`理由（任意）`}
+                                value={note}
+                                onChange={e => handleBulkRSVPChange(session.id, status, e.target.value)}
+                                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-md px-3 py-1.5 text-xs text-white placeholder:text-white/20 focus:outline-none"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* 一括保存ボタン */}
+                    <div className="pt-4 mt-2 border-t border-white/[0.08] flex justify-end">
+                      <button
+                        onClick={() => saveBulkRSVPs(groupName, groupSessions)}
+                        disabled={bulkSaving || !groupSessions.some(s => editingRSVPs[s.id])}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 transition-all"
+                      >
+                        {bulkSaving ? '保存中...' : '変更をまとめて保存'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
