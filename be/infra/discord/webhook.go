@@ -14,6 +14,11 @@ import (
 
 // NotifyRSVP sends a notification to configured Discord channels using webhooks
 func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, rsvp *domain.FEPracticeRSVP) {
+	// Skip notifications for voluntary team practices to avoid spamming main channels
+	if session.Type == "team" {
+		return
+	}
+
 	// Determine target genres
 	genres := session.TargetGenres
 	if len(genres) == 0 && rsvp.Genre != "" {
