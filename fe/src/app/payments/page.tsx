@@ -21,7 +21,9 @@ import type {
   CashCollector,
   NumberRoster,
   TargetType,
+  FEUser,
 } from '@/lib/api';
+import MemberSelectDropdown from '@/components/MemberSelectDropdown';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 const GENERATIONS = [16, 17];
@@ -69,18 +71,10 @@ export default function PaymentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [numberRosters, setNumberRosters] = useState<NumberRoster[]>([]);
-  const [addedMembers, setAddedMembers] = useState<{ id: string; name: string }[]>([]);
-  const [memberInput, setMemberInput] = useState('');
-  const [memberInputError, setMemberInputError] = useState('');
-  const [memberInputLoading, setMemberInputLoading] = useState(false);
-  const [addedExtraMembers, setAddedExtraMembers] = useState<{ id: string; name: string }[]>([]);
-  const [extraMemberInput, setExtraMemberInput] = useState('');
-  const [extraMemberError, setExtraMemberError] = useState('');
-  const [extraMemberLoading, setExtraMemberLoading] = useState(false);
+  const [allUsers, setAllUsers] = useState<FEUser[]>([]);
+  const [targetMembers, setTargetMembers] = useState<{ id: string; name: string }[]>([]);
+  const [extraMembers, setExtraMembers] = useState<{ id: string; name: string }[]>([]);
   const [excludedMembers, setExcludedMembers] = useState<{ id: string; name: string }[]>([]);
-  const [excludedMemberInput, setExcludedMemberInput] = useState('');
-  const [excludedMemberError, setExcludedMemberError] = useState('');
-  const [excludedMemberLoading, setExcludedMemberLoading] = useState(false);
   const [cashCollectorInput, setCashCollectorInput] = useState('');
   const [cashCollectorError, setCashCollectorError] = useState('');
   const [cashCollectorLoading, setCashCollectorLoading] = useState(false);
@@ -115,12 +109,14 @@ export default function PaymentsPage() {
 
   const load = async (mid: string) => {
     try {
-      const [settlements, rosters] = await Promise.all([
+      const [settlements, rosters, users] = await Promise.all([
         getSettlements(),
         getNumberRosters(),
+        getAllUsers(),
       ]);
       setAllSettlements(settlements);
       setNumberRosters(rosters);
+      setAllUsers(users);
 
       const incoming = settlements.filter(s => s.resolvedMemberIds?.includes(mid));
       const statusMap: Record<string, PaymentRecord | null> = {};
@@ -169,54 +165,29 @@ export default function PaymentsPage() {
   const togglePaymentMethod = (m: PaymentMethod) =>
     setForm(f => ({ ...f, paymentMethods: f.paymentMethods.includes(m) ? f.paymentMethods.filter(x => x !== m) : [...f.paymentMethods, m] }));
 
-  const handleAddMember = async () => {
-    const id = memberInput.trim();
-    if (!id) return;
-    if (addedMembers.find(m => m.id === id)) { setMemberInputError('すでに追加されています'); return; }
-    setMemberInputLoading(true); setMemberInputError('');
-    const user = await getUser(id);
-    setMemberInputLoading(false);
-    if (!user) { setMemberInputError('会員番号が見つかりません'); return; }
-    setAddedMembers(prev => [...prev, { id, name: user.name as string }]);
-    setForm(f => ({ ...f, targetMemberIds: [...f.targetMemberIds, id] }));
-    setMemberInput('');
+  const handleAddTarget = (m: { id: string; name: string }) => {
+    setTargetMembers(prev => [...prev, m]);
+    setForm(f => ({ ...f, targetMemberIds: [...f.targetMemberIds, m.id] }));
   };
-
-  const handleRemoveMember = (id: string) => {
-    setAddedMembers(prev => prev.filter(m => m.id !== id));
+  const handleRemoveTarget = (id: string) => {
+    setTargetMembers(prev => prev.filter(m => m.id !== id));
     setForm(f => ({ ...f, targetMemberIds: f.targetMemberIds.filter(x => x !== id) }));
   };
 
-  const handleAddExtraMember = async () => {
-    const id = extraMemberInput.trim();
-    if (!id) return;
-    if (addedExtraMembers.find(m => m.id === id)) { setExtraMemberError('すでに追加されています'); return; }
-    setExtraMemberLoading(true); setExtraMemberError('');
-    const user = await getUser(id);
-    setExtraMemberLoading(false);
-    if (!user) { setExtraMemberError('会員番号が見つかりません'); return; }
-    setAddedExtraMembers(prev => [...prev, { id, name: user.name as string }]);
-    setForm(f => ({ ...f, additionalMemberIds: [...f.additionalMemberIds, id] }));
-    setExtraMemberInput('');
+  const handleAddExtra = (m: { id: string; name: string }) => {
+    setExtraMembers(prev => [...prev, m]);
+    setForm(f => ({ ...f, additionalMemberIds: [...f.additionalMemberIds, m.id] }));
   };
-  const handleRemoveExtraMember = (id: string) => {
-    setAddedExtraMembers(prev => prev.filter(m => m.id !== id));
+  const handleRemoveExtra = (id: string) => {
+    setExtraMembers(prev => prev.filter(m => m.id !== id));
     setForm(f => ({ ...f, additionalMemberIds: f.additionalMemberIds.filter(x => x !== id) }));
   };
 
-  const handleAddExcludedMember = async () => {
-    const id = excludedMemberInput.trim();
-    if (!id) return;
-    if (excludedMembers.find(m => m.id === id)) { setExcludedMemberError('すでに追加されています'); return; }
-    setExcludedMemberLoading(true); setExcludedMemberError('');
-    const user = await getUser(id);
-    setExcludedMemberLoading(false);
-    if (!user) { setExcludedMemberError('会員番号が見つかりません'); return; }
-    setExcludedMembers(prev => [...prev, { id, name: user.name as string }]);
-    setForm(f => ({ ...f, excludedMemberIds: [...f.excludedMemberIds, id] }));
-    setExcludedMemberInput('');
+  const handleAddExcluded = (m: { id: string; name: string }) => {
+    setExcludedMembers(prev => [...prev, m]);
+    setForm(f => ({ ...f, excludedMemberIds: [...f.excludedMemberIds, m.id] }));
   };
-  const handleRemoveExcludedMember = (id: string) => {
+  const handleRemoveExcluded = (id: string) => {
     setExcludedMembers(prev => prev.filter(m => m.id !== id));
     setForm(f => ({ ...f, excludedMemberIds: f.excludedMemberIds.filter(x => x !== id) }));
   };
@@ -237,7 +208,7 @@ export default function PaymentsPage() {
     if (!form.title || !form.amount || !form.dueDate) { alert('タイトル・金額・期限は必須です'); return; }
     if (form.paymentMethods.length === 0) { alert('支払い方法を1つ以上選択してください'); return; }
     if (form.targetType === 'number' && !form.targetNumberId) { alert('ナンバー名簿を選択してください'); return; }
-    if (form.targetType === 'individual' && addedMembers.length === 0) { alert('対象者を1人以上追加してください'); return; }
+    if (form.targetType === 'individual' && targetMembers.length === 0) { alert('対象者を1人以上追加してください'); return; }
 
     setCreating(true);
     try {
@@ -245,7 +216,6 @@ export default function PaymentsPage() {
       let resolvedMemberIds: string[] = [];
 
       if (form.targetType === 'genre_generation') {
-        const allUsers = await getAllUsers();
         const targets = allUsers.filter(u => {
           const genreOk = !form.targetGenres.length || form.targetGenres.includes(u.genre as string);
           const genOk = !form.targetGenerations.length || form.targetGenerations.includes(u.generation as number);
@@ -261,12 +231,12 @@ export default function PaymentsPage() {
           resolvedMemberIds = roster.memberIds;
         }
       } else {
-        payments = addedMembers.map(m => ({ memberId: m.id, name: m.name }));
-        resolvedMemberIds = addedMembers.map(m => m.id);
+        payments = targetMembers.map(m => ({ memberId: m.id, name: m.name }));
+        resolvedMemberIds = targetMembers.map(m => m.id);
       }
 
       // additionalMemberIds を追加（重複除外）
-      for (const extra of addedExtraMembers) {
+      for (const extra of extraMembers) {
         if (!resolvedMemberIds.includes(extra.id)) {
           resolvedMemberIds = [...resolvedMemberIds, extra.id];
           payments = [...payments, { memberId: extra.id, name: extra.name }];
@@ -282,7 +252,7 @@ export default function PaymentsPage() {
         payments,
       );
 
-      setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); setMemberInput(''); setAddedExtraMembers([]); setExtraMemberInput(''); setExcludedMembers([]); setExcludedMemberInput(''); setCashCollectorInput('');
+      setShowForm(false); setForm(EMPTY_FORM); setTargetMembers([]); setExtraMembers([]); setExcludedMembers([]); setCashCollectorInput('');
       load(memberId);
     } finally {
       setCreating(false);
@@ -627,85 +597,49 @@ export default function PaymentsPage() {
             )}
 
             {form.targetType === 'individual' && (
-              <div className="pl-5 space-y-2">
-                <div className="flex gap-2">
-                  <input type="text" placeholder="会員番号（例：16199）" value={memberInput}
-                    onChange={e => { setMemberInput(e.target.value); setMemberInputError(''); }}
-                    onKeyDown={e => e.key === 'Enter' && handleAddMember()}
-                    className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none" />
-                  <button onClick={handleAddMember} disabled={memberInputLoading || !memberInput.trim()}
-                    className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
-                    {memberInputLoading ? '...' : '追加'}
-                  </button>
-                </div>
-                {memberInputError && <p className="text-xs text-red-400">{memberInputError}</p>}
-                {addedMembers.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {addedMembers.map(m => (
-                      <span key={m.id} className="flex items-center gap-1 text-xs bg-white/[0.06] text-white/60 px-2.5 py-1 rounded-full">
-                        {m.name}<button onClick={() => handleRemoveMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
-                      </span>
-                    ))}
-                  </div>
-                ) : <p className="text-xs text-white/20">まだ誰も追加されていません</p>}
+              <div className="pl-5">
+                <MemberSelectDropdown
+                  allUsers={allUsers}
+                  selected={targetMembers}
+                  onAdd={handleAddTarget}
+                  onRemove={handleRemoveTarget}
+                  chipColor="green"
+                  placeholder="対象メンバーを選択..."
+                />
               </div>
             )}
 
             {/* 追加メンバー */}
-            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
+            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-1.5">
               <label className="text-[11px] text-white/30 block">+ 追加でメンバーを固定指定（任意）</label>
               <p className="text-[10px] text-white/20">上記の条件に加え、特定のメンバーを個別に追加できます。</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="会員番号（例：16199）" value={extraMemberInput}
-                  onChange={e => { setExtraMemberInput(e.target.value); setExtraMemberError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleAddExtraMember()}
-                  className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none" />
-                <button onClick={handleAddExtraMember} disabled={extraMemberLoading || !extraMemberInput.trim()}
-                  className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
-                  {extraMemberLoading ? '...' : '追加'}
-                </button>
-              </div>
-              {extraMemberError && <p className="text-xs text-red-400">{extraMemberError}</p>}
-              {addedExtraMembers.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {addedExtraMembers.map(m => (
-                    <span key={m.id} className="flex items-center gap-1 text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded-full">
-                      {m.name}<button onClick={() => handleRemoveExtraMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <MemberSelectDropdown
+                allUsers={allUsers}
+                selected={extraMembers}
+                onAdd={handleAddExtra}
+                onRemove={handleRemoveExtra}
+                chipColor="green"
+                placeholder="追加するメンバーを選択..."
+              />
             </div>
 
             {/* 除外メンバー */}
-            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
+            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-1.5">
               <label className="text-[11px] text-white/30 block">除外するメンバー（任意）</label>
               <p className="text-[10px] text-white/20">上記の条件に該当していても、このメンバーは対象から外れます。</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="会員番号（例：16199）" value={excludedMemberInput}
-                  onChange={e => { setExcludedMemberInput(e.target.value); setExcludedMemberError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleAddExcludedMember()}
-                  className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none" />
-                <button onClick={handleAddExcludedMember} disabled={excludedMemberLoading || !excludedMemberInput.trim()}
-                  className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
-                  {excludedMemberLoading ? '...' : '除外'}
-                </button>
-              </div>
-              {excludedMemberError && <p className="text-xs text-red-400">{excludedMemberError}</p>}
-              {excludedMembers.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {excludedMembers.map(m => (
-                    <span key={m.id} className="flex items-center gap-1 text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full">
-                      {m.name}<button onClick={() => handleRemoveExcludedMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <MemberSelectDropdown
+                allUsers={allUsers}
+                selected={excludedMembers}
+                onAdd={handleAddExcluded}
+                onRemove={handleRemoveExcluded}
+                chipColor="red"
+                placeholder="除外するメンバーを選択..."
+              />
             </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); setMemberInput(''); setCashCollectorInput(''); }}
+            <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setTargetMembers([]); setExtraMembers([]); setExcludedMembers([]); setCashCollectorInput(''); }}
               className="text-xs px-3 py-1.5 text-white/40 hover:text-white/60">キャンセル</button>
             <button onClick={handleCreate} disabled={creating}
               className="text-xs px-4 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg">
