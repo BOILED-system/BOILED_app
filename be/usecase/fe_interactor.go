@@ -101,7 +101,7 @@ func (i *FEInteractor) SubmitRSVP(ctx context.Context, sessionID string, rsvp *d
 	// Trigger Discord webhook dynamically using goroutine
 	session, err := i.sessionRepo.GetByID(ctx, sessionID)
 	if err == nil && session != nil {
-		go discord.NotifyRSVP(context.Background(), session, rsvp)
+		go discord.NotifyRSVP(context.Background(), session, oldRSVP, rsvp)
 	}
 
 	return nil

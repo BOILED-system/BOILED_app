@@ -13,7 +13,7 @@ import (
 )
 
 // NotifyRSVP sends a notification to configured Discord channels using webhooks
-func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, rsvp *domain.FEPracticeRSVP) {
+func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, oldRSVP, rsvp *domain.FEPracticeRSVP) {
 	// Skip notifications for voluntary team practices to avoid spamming main channels
 	if session.Type == "team" {
 		return
@@ -27,14 +27,16 @@ func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, rsvp *do
 	}
 
 	// Format Japanese status
-	statusJp := "出席"
-	switch rsvp.Status {
-	case "NO":
-		statusJp = "欠席"
-	case "LATE":
-		statusJp = "遅刻"
-	case "EARLY":
-		statusJp = "早退"
+	statusMap := map[string]string{
+		"GO":    "出席",
+		"NO":    "欠席",
+		"LATE":  "遅刻",
+		"EARLY": "早退",
+	}
+
+	statusJp := statusMap[rsvp.Status]
+	if statusJp == "" {
+		statusJp = rsvp.Status
 	}
 
 	// Prepend type indicator
@@ -46,7 +48,21 @@ func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, rsvp *do
 	}
 
 	// Compose message
-	message := fmt.Sprintf("📝 **[出欠更新]** %s: %s (%s)\n**%s** さんが 「**%s**」 を入力しました。", typePrefix, session.Name, session.Date, rsvp.Name, statusJp)
+	var message string
+	if oldRSVP == nil {
+		message = fmt.Sprintf("📝 **[新規登録]** %s: %s (%s)\n**%s** さんが 「**%s**」 を入力しました。", typePrefix, session.Name, session.Date, rsvp.Name, statusJp)
+	} else {
+		oldStatusJp := statusMap[oldRSVP.Status]
+		if oldStatusJp == "" {
+			oldStatusJp = "未登録"
+		}
+		// If only the note changed but status is the same
+		if oldRSVP.Status == rsvp.Status {
+			message = fmt.Sprintf("📝 **[メモ更新]** %s: %s (%s)\n**%s** さんがメモ・理由を更新しました。（%s）", typePrefix, session.Name, session.Date, rsvp.Name, statusJp)
+		} else {
+			message = fmt.Sprintf("📝 **[出欠変更]** %s: %s (%s)\n**%s** さんが出欠を変更しました。（%s ➔ **%s**）", typePrefix, session.Name, session.Date, rsvp.Name, oldStatusJp, statusJp)
+		}
+	}
 	if rsvp.Note != "" {
 		message += fmt.Sprintf("\n> 理由・メモ: %s", rsvp.Note)
 	}
