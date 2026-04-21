@@ -25,8 +25,9 @@ type FEPracticeSession struct {
 	TargetGenres      []string `json:"targetGenres" firestore:"targetGenres"`
 	TargetGenerations []int    `json:"targetGenerations" firestore:"targetGenerations"`
 	TargetNumberID    string   `json:"targetNumberId" firestore:"targetNumberId"`
-	TargetMemberIDs   []string `json:"targetMemberIds" firestore:"targetMemberIds"`
-	CreatedAt         any      `json:"createdAt" firestore:"createdAt"`
+	TargetMemberIDs      []string `json:"targetMemberIds" firestore:"targetMemberIds"`
+	AdditionalMemberIDs  []string `json:"additionalMemberIds" firestore:"additionalMemberIds"`
+	CreatedAt            any      `json:"createdAt" firestore:"createdAt"`
 }
 
 // FEPracticeRSVP represents a practice attendance record matching frontend schema.

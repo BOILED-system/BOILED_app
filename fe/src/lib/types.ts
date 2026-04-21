@@ -39,6 +39,7 @@ export interface PracticeSession {
   targetGenerations: number[];
   targetNumberId: string;
   targetMemberIds: string[];
+  additionalMemberIds: string[];
   createdAt: any;
 }
 

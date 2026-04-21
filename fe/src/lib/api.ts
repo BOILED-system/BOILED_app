@@ -116,6 +116,7 @@ export async function createPracticeSession(data: {
   targetGenerations: number[];
   targetNumberId: string;
   targetMemberIds: string[];
+  additionalMemberIds: string[];
 }): Promise<string> {
   const result = await apiPost<PracticeSession>('/api/practice-sessions', data);
   return result.id;
@@ -300,6 +301,8 @@ export function isSessionForMember(
   if (tt === 'individual') {
     return session.targetMemberIds?.includes(memberId) ?? false;
   }
+  // additionalMemberIds is a bonus list on top of the primary targeting logic
+  if (session.additionalMemberIds?.includes(memberId)) return true;
   return true;
 }
 
