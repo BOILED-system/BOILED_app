@@ -11,6 +11,7 @@ import (
 
 	"github.com/noa/circle-app/api/adapter/http/handler"
 	"github.com/noa/circle-app/api/adapter/http/router"
+	cacheRepo "github.com/noa/circle-app/api/infra/cache"
 	firestoreRepo "github.com/noa/circle-app/api/infra/firestore"
 	"github.com/noa/circle-app/api/infra/gemini"
 	"github.com/noa/circle-app/api/usecase"
@@ -71,13 +72,14 @@ func main() {
 	practiceRSVPRepo := firestoreRepo.NewPracticeRSVPRepository(firestoreClient)
 
 	// Initialize FE-compatible repositories (infra layer)
-	feUserRepo := firestoreRepo.NewFEUserRepository(firestoreClient)
-	fePracticeSessionRepo := firestoreRepo.NewFEPracticeSessionRepository(firestoreClient)
-	fePracticeRSVPRepo := firestoreRepo.NewFEPracticeRSVPRepository(firestoreClient)
-	feRosterRepo := firestoreRepo.NewNumberRosterRepository(firestoreClient)
-	feEventRepo := firestoreRepo.NewFEEventRepository(firestoreClient)
-	feSettlementRepo := firestoreRepo.NewFESettlementRepository(firestoreClient)
-	fePaymentRepo := firestoreRepo.NewFEPaymentRepository(firestoreClient)
+	cacheStore := cacheRepo.NewStore()
+	feUserRepo := cacheRepo.NewFEUserRepository(firestoreRepo.NewFEUserRepository(firestoreClient), cacheStore)
+	fePracticeSessionRepo := cacheRepo.NewFEPracticeSessionRepository(firestoreRepo.NewFEPracticeSessionRepository(firestoreClient), cacheStore)
+	fePracticeRSVPRepo := cacheRepo.NewFEPracticeRSVPRepository(firestoreRepo.NewFEPracticeRSVPRepository(firestoreClient), cacheStore)
+	feRosterRepo := cacheRepo.NewNumberRosterRepository(firestoreRepo.NewNumberRosterRepository(firestoreClient), cacheStore)
+	feEventRepo := cacheRepo.NewFEEventRepository(firestoreRepo.NewFEEventRepository(firestoreClient), cacheStore)
+	feSettlementRepo := cacheRepo.NewFESettlementRepository(firestoreRepo.NewFESettlementRepository(firestoreClient), cacheStore)
+	fePaymentRepo := cacheRepo.NewFEPaymentRepository(firestoreRepo.NewFEPaymentRepository(firestoreClient), cacheStore)
 
 	// Initialize AI service (infra layer)
 	aiService := gemini.NewAIService(geminiAPIKey)
