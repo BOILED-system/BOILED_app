@@ -4,39 +4,23 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   getPracticeSessions,
-  getMyRSVP,
   createPracticeSession,
-  updatePracticeSession,
-  deletePracticeSession,
   getNumberRosters,
   getUser,
-  isSessionForMember,
-  submitRSVP,
 } from '@/lib/api';
 import type { PracticeSession, NumberRoster, TargetType } from '@/lib/api';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
-
+const GENERATIONS = [16, 17];
 const addTwoHours = (time: string): string => {
   if (!time) return '';
   const [h, m] = time.split(':').map(Number);
   return `${String((h + 2) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
-const GENERATIONS = [16, 17];
-
-const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
-const STATUS_COLORS: Record<string, string> = {
-  GO: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
-  NO: 'bg-red-500/20 text-red-400 border border-red-500/30',
-  LATE: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
-  EARLY: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
-};
 
 const EMPTY_FORM = {
   name: '',
-  date: '',
-  startTime: '',
-  endTime: '',
+  schedules: [{ date: '', startTime: '19:00', endTime: '21:00' }],
   location: '',
   note: '',
   type: 'regular' as 'regular' | 'event',
@@ -49,12 +33,9 @@ const EMPTY_FORM = {
 
 export default function PracticesPage() {
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
-  const [myRSVPs, setMyRSVPs] = useState<Record<string, { status: string; note: string }>>({});
   const [loading, setLoading] = useState(true);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [editingRSVPs, setEditingRSVPs] = useState<Record<string, { status: string; note: string }>>({});
-  const [bulkSaving, setBulkSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [memberId, setMemberId] = useState('');
   const [numberRosters, setNumberRosters] = useState<NumberRoster[]>([]);
@@ -66,15 +47,6 @@ export default function PracticesPage() {
   const [memberInputError, setMemberInputError] = useState('');
   const [memberInputLoading, setMemberInputLoading] = useState(false);
 
-  // 編集モーダル
-  const [editingSession, setEditingSession] = useState<PracticeSession | null>(null);
-  const [editForm, setEditForm] = useState(EMPTY_FORM);
-  const [editSaving, setEditSaving] = useState(false);
-  const [editAddedMembers, setEditAddedMembers] = useState<{ id: string; name: string }[]>([]);
-  const [editMemberInput, setEditMemberInput] = useState('');
-  const [editMemberError, setEditMemberError] = useState('');
-  const [editMemberLoading, setEditMemberLoading] = useState(false);
-
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'member';
     const mid = localStorage.getItem('memberId') || '';
@@ -85,27 +57,12 @@ export default function PracticesPage() {
 
   const load = async (mid: string, role: string) => {
     try {
-      const [allSessions, rosters, user] = await Promise.all([
+      const [allSessions, rosters] = await Promise.all([
         getPracticeSessions(),
         getNumberRosters(),
-        mid ? getUser(mid) : Promise.resolve(null),
       ]);
       setNumberRosters(rosters);
-
-      const genre = user?.genre || '';
-      const generation = user?.generation || 0;
-
-      const sorted = allSessions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      setSessions(sorted);
-
-      if (mid) {
-        const rsvpMap: Record<string, { status: string; note: string }> = {};
-        await Promise.all(sorted.map(async s => {
-          const rsvp = await getMyRSVP(s.id, mid);
-          if (rsvp) rsvpMap[s.id] = { status: rsvp.status, note: rsvp.note || '' };
-        }));
-        setMyRSVPs(rsvpMap);
-      }
+      setSessions(allSessions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     } catch (e) {
       console.error(e);
     } finally {
@@ -113,74 +70,22 @@ export default function PracticesPage() {
     }
   };
 
-  // ===== 一括保存ロジック =====
-
-  const toggleGroup = (name: string) => setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
-  
-  const handleBulkRSVPChange = (sessionId: string, status: string, note: string) => {
-    setEditingRSVPs(prev => ({ ...prev, [sessionId]: { status, note } }));
-  };
-
-  const saveBulkRSVPs = async (groupName: string, groupSessions: PracticeSession[]) => {
-    const changedSessionIds = groupSessions.map(s => s.id).filter(id => editingRSVPs[id]);
-    if (changedSessionIds.length === 0) return;
-
-    setBulkSaving(true);
-    try {
-      const user = await getUser(memberId);
-      if (!user) return;
-      await Promise.all(changedSessionIds.map(id => 
-        submitRSVP({
-          sessionId: id,
-          memberId: memberId,
-          name: user.name,
-          genre: user.genre,
-          generation: user.generation,
-          status: editingRSVPs[id].status as any,
-          note: editingRSVPs[id].note,
-        })
-      ));
-      setMyRSVPs(prev => {
-        const next = { ...prev };
-        changedSessionIds.forEach(id => { next[id] = editingRSVPs[id]; });
-        return next;
-      });
-      setEditingRSVPs(prev => {
-        const next = { ...prev };
-        changedSessionIds.forEach(id => delete next[id]);
-        return next;
-      });
-      alert('一括保存しました');
-    } catch (e) {
-      console.error(e);
-      alert('保存に失敗しました');
-    } finally {
-      setBulkSaving(false);
-    }
-  };
-
-  const groupedSessions = sessions.reduce((acc, session) => {
-    if (!acc[session.name]) acc[session.name] = [];
-    acc[session.name].push(session);
-    return acc;
-  }, {} as Record<string, PracticeSession[]>);
-
-  // ===== 作成 =====
-
   const handleCreate = async () => {
-    if (!form.name || !form.date || !form.startTime || !form.location) {
-      alert('練習名・日付・開始時間・場所は必須です');
-      return;
-    }
-    if (form.targetType === 'number' && !form.targetNumberId) {
-      alert('ナンバー名簿を選択してください');
-      return;
-    }
-    await createPracticeSession({ ...form });
+    if (!form.name || !form.location) { alert('練習名・場所は必須です'); return; }
+    const validSchedules = form.schedules.filter(s => s.date && s.startTime);
+    if (validSchedules.length === 0) { alert('少なくとも1つの有効な日程（日付・開始時間）を追加してください'); return; }
+    if (form.targetType === 'number' && !form.targetNumberId) { alert('ナンバー名簿を選択してください'); return; }
+    
+    setIsCreating(true);
+    await Promise.all(validSchedules.map(sch => createPracticeSession({ 
+      ...form, date: sch.date, startTime: sch.startTime, endTime: sch.endTime 
+    })));
+    
     setShowForm(false);
     setForm(EMPTY_FORM);
     setAddedMembers([]);
     setMemberInput('');
+    setIsCreating(false);
     load(memberId, userRole);
   };
 
@@ -196,123 +101,27 @@ export default function PracticesPage() {
     setForm(f => ({ ...f, targetMemberIds: [...f.targetMemberIds, id] }));
     setMemberInput('');
   };
-
   const handleRemoveMember = (id: string) => {
     setAddedMembers(prev => prev.filter(m => m.id !== id));
     setForm(f => ({ ...f, targetMemberIds: f.targetMemberIds.filter(mid => mid !== id) }));
   };
 
-  const toggleGenre = (genre: string) =>
-    setForm(f => ({ ...f, targetGenres: f.targetGenres.includes(genre) ? f.targetGenres.filter(g => g !== genre) : [...f.targetGenres, genre] }));
+  const toggleGenre = (genre: string) => setForm(f => ({ ...f, targetGenres: f.targetGenres.includes(genre) ? f.targetGenres.filter(g => g !== genre) : [...f.targetGenres, genre] }));
+  const toggleGeneration = (gen: number) => setForm(f => ({ ...f, targetGenerations: f.targetGenerations.includes(gen) ? f.targetGenerations.filter(g => g !== gen) : [...f.targetGenerations, gen] }));
 
-  const toggleGeneration = (gen: number) =>
-    setForm(f => ({ ...f, targetGenerations: f.targetGenerations.includes(gen) ? f.targetGenerations.filter(g => g !== gen) : [...f.targetGenerations, gen] }));
-
-  // ===== 編集 =====
-
-  const openEdit = (s: PracticeSession) => {
-    setEditingSession(s);
-    setEditForm({
-      name: s.name, date: s.date, startTime: s.startTime, endTime: s.endTime || '',
-      location: s.location || '', note: s.note || '', type: s.type || 'regular',
-      targetType: s.targetType || 'genre_generation',
-      targetGenres: s.targetGenres || [], targetGenerations: s.targetGenerations || [],
-      targetNumberId: s.targetNumberId || '', targetMemberIds: s.targetMemberIds || [],
-    });
-    if (s.targetType === 'individual' && s.targetMemberIds?.length) {
-      Promise.all(s.targetMemberIds.map(async mid => {
-        const u = await getUser(mid);
-        return { id: mid, name: u?.name as string || mid };
-      })).then(setEditAddedMembers);
-    } else {
-      setEditAddedMembers([]);
-    }
-    setEditMemberInput(''); setEditMemberError('');
-  };
-
-  const handleEditSave = async () => {
-    if (!editingSession) return;
-    if (!editForm.name || !editForm.date || !editForm.startTime) {
-      alert('練習名・日付・開始時間は必須です');
-      return;
-    }
-    setEditSaving(true);
-    await updatePracticeSession(editingSession.id, {
-      name: editForm.name, date: editForm.date, startTime: editForm.startTime,
-      endTime: editForm.endTime, location: editForm.location, note: editForm.note,
-      type: editForm.type, targetType: editForm.targetType,
-      targetGenres: editForm.targetGenres, targetGenerations: editForm.targetGenerations,
-      targetNumberId: editForm.targetNumberId, targetMemberIds: editForm.targetMemberIds,
-    });
-    setSessions(prev => prev.map(s => s.id === editingSession.id ? { ...s, ...editForm } : s));
-    setEditSaving(false);
-    setEditingSession(null);
-  };
-
-  const handleDelete = async (s: PracticeSession) => {
-    if (!confirm(`「${s.name}」を削除しますか？`)) return;
-    await deletePracticeSession(s.id);
-    setSessions(prev => prev.filter(x => x.id !== s.id));
-  };
-
-  const toggleEditGenre = (g: string) =>
-    setEditForm(f => ({ ...f, targetGenres: f.targetGenres.includes(g) ? f.targetGenres.filter(x => x !== g) : [...f.targetGenres, g] }));
-
-  const toggleEditGen = (g: number) =>
-    setEditForm(f => ({ ...f, targetGenerations: f.targetGenerations.includes(g) ? f.targetGenerations.filter(x => x !== g) : [...f.targetGenerations, g] }));
-
-  const handleEditAddMember = async () => {
-    const mid = editMemberInput.trim();
-    if (!mid) return;
-    if (editAddedMembers.find(m => m.id === mid)) { setEditMemberError('すでに追加されています'); return; }
-    setEditMemberLoading(true); setEditMemberError('');
-    const user = await getUser(mid);
-    setEditMemberLoading(false);
-    if (!user) { setEditMemberError('会員番号が見つかりません'); return; }
-    setEditAddedMembers(prev => [...prev, { id: mid, name: user.name as string }]);
-    setEditForm(f => ({ ...f, targetMemberIds: [...f.targetMemberIds, mid] }));
-    setEditMemberInput('');
-  };
-
-  const handleEditRemoveMember = (mid: string) => {
-    setEditAddedMembers(prev => prev.filter(m => m.id !== mid));
-    setEditForm(f => ({ ...f, targetMemberIds: f.targetMemberIds.filter(x => x !== mid) }));
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  // ===== ターゲット選択フォーム（作成・編集共通） =====
-  const TargetForm = ({
-    f, setF, addedM, memberIn, setMemberIn, memberErr, memberLoading,
-    onAddMember, onRemoveMember, onToggleGenre, onToggleGen, rosters,
-  }: {
-    f: typeof EMPTY_FORM;
-    setF: (fn: (prev: typeof EMPTY_FORM) => typeof EMPTY_FORM) => void;
-    addedM: { id: string; name: string }[];
-    memberIn: string; setMemberIn: (v: string) => void;
-    memberErr: string; memberLoading: boolean;
-    onAddMember: () => void; onRemoveMember: (id: string) => void;
-    onToggleGenre: (g: string) => void; onToggleGen: (g: number) => void;
-    rosters: NumberRoster[];
-  }) => (
+  const TargetForm = ({ f, setF, addedM, memberIn, setMemberIn, memberErr, memberLoading, onAddMember, onRemoveMember, onToggleGenre, onToggleGen, rosters }: any) => (
     <div className="space-y-3">
-      <label className="text-[11px] text-white/30 block">対象者の指定方法</label>
-      <div className="space-y-1.5">
+      <label className="text-[11px] text-white/30 block mb-1">対象者の指定方法</label>
+      <div className="space-y-1.5 mb-2">
         {[
           { value: 'genre_generation', label: 'ジャンル・代で絞り込む' },
           { value: 'number', label: 'ナンバー名簿から選ぶ' },
           { value: 'individual', label: '会員番号で個別指定' },
         ].map(opt => (
           <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
-            <input type="radio" name={`targetType_${f.name}`} value={opt.value}
+            <input type="radio" name={`targetType_${f.name || 'new'}`} value={opt.value}
               checked={f.targetType === opt.value}
-              onChange={() => setF(prev => ({ ...prev, targetType: opt.value as TargetType }))}
+              onChange={() => setF((prev: any) => ({ ...prev, targetType: opt.value as TargetType }))}
               className="accent-blue-500" />
             <span className="text-sm text-white/60">{opt.label}</span>
           </label>
@@ -353,11 +162,10 @@ export default function PracticesPage() {
           {rosters.length === 0 ? (
             <p className="text-xs text-white/30">名簿がまだありません。<a href="/numbers" className="text-blue-400 ml-1">名簿を作成 →</a></p>
           ) : (
-            <select value={f.targetNumberId}
-              onChange={e => setF(prev => ({ ...prev, targetNumberId: e.target.value }))}
+            <select value={f.targetNumberId} onChange={e => setF((prev: any) => ({ ...prev, targetNumberId: e.target.value }))}
               className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
               <option value="">名簿を選択...</option>
-              {rosters.map(r => <option key={r.id} value={r.id}>{r.name}（{r.memberIds.length}人）</option>)}
+              {rosters.map((r: NumberRoster) => <option key={r.id} value={r.id}>{r.name}（{r.memberIds.length}人）</option>)}
             </select>
           )}
         </div>
@@ -373,294 +181,136 @@ export default function PracticesPage() {
             <button type="button" onClick={onAddMember}
               disabled={memberLoading || !memberIn.trim()}
               className="text-xs px-3 py-1.5 bg-white/[0.06] text-white/60 rounded-lg hover:bg-white/[0.1] disabled:opacity-40">
-              {memberLoading ? '...' : '追加'}
+              追加
             </button>
           </div>
-          {memberErr && <p className="text-xs text-red-400">{memberErr}</p>}
-          {addedM.length > 0 ? (
+          {addedM.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {addedM.map(m => (
+              {addedM.map((m: any) => (
                 <span key={m.id} className="flex items-center gap-1 text-xs bg-white/[0.06] text-white/60 px-2.5 py-1 rounded-full">
-                  {m.name}
-                  <button type="button" onClick={() => onRemoveMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
+                  {m.name}<button type="button" onClick={() => onRemoveMember(m.id)} className="text-white/30 hover:text-red-400 ml-0.5">×</button>
                 </span>
               ))}
             </div>
-          ) : (
-            <p className="text-xs text-white/20">まだ誰も追加されていません</p>
           )}
         </div>
       )}
     </div>
   );
 
+  const groupedSessions = sessions.reduce((acc, session) => {
+    if (!acc[session.name]) acc[session.name] = [];
+    acc[session.name].push(session);
+    return acc;
+  }, {} as Record<string, PracticeSession[]>);
+
+  if (loading) return <div className="flex justify-center py-20"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"/></div>;
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* ヘッダー */}
+    <div className="max-w-2xl mx-auto space-y-6 pb-12">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-white">練習</h1>
         <div className="flex gap-2">
-          <Link href="/numbers"
-            className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
+          <Link href="/numbers" className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
             名簿管理
           </Link>
-          <button onClick={() => setShowForm(!showForm)}
-            className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors">
-            + 練習を追加
+          <button onClick={() => setShowForm(!showForm)} className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors font-bold shadow-lg shadow-blue-500/20">
+            + プロジェクトを追加
           </button>
         </div>
       </div>
 
-      {/* 作成フォーム */}
       {showForm && (
-        <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-4">
-          <p className="text-xs font-medium text-white/40 uppercase tracking-wider">練習を作成</p>
+        <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-5 space-y-5 shadow-2xl">
+          <p className="text-xs font-bold text-white/40 uppercase tracking-wider">新規練習プロジェクトの作成</p>
 
-          {/* 種別選択をフォーム内に */}
           <div className="flex gap-2">
             {(['regular', 'event'] as const).map(t => (
               <button key={t} type="button" onClick={() => setForm(f => ({ ...f, type: t }))}
-                className={`flex-1 py-2 text-xs rounded-lg border transition-colors ${form.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
+                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${form.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
                 {t === 'regular' ? '正規練' : 'イベント練'}
               </button>
             ))}
           </div>
 
-          <input type="text"
-            placeholder={form.type === 'regular' ? '例：Hiphop正規練' : '例：新歓イベ Hiphopナンバー練'}
-            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
+          <input type="text" placeholder={form.type === 'regular' ? 'プロジェクト名（例：Hiphop正規練）' : 'プロジェクト名（例：新歓Hiphop）'} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50" />
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-[11px] text-white/30 block mb-1">日付</label>
-              <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-            </div>
-            <div>
-              <label className="text-[11px] text-white/30 block mb-1">開始</label>
-              <input type="time" value={form.startTime} onChange={e => {
-                const start = e.target.value;
-                setForm({ ...form, startTime: start, endTime: addTwoHours(start) });
-              }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-            </div>
-            <div>
-              <label className="text-[11px] text-white/30 block mb-1">終了</label>
-              <input type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })}
-                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-            </div>
-          </div>
-
-          <input type="text" placeholder="場所（例：マイスタ4B）" value={form.location}
-            onChange={e => setForm({ ...form, location: e.target.value })}
-            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
-
-          <textarea placeholder="メモ（任意）" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })}
-            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none resize-none" rows={2} />
-
-          <TargetForm
-            f={form} setF={fn => setForm(fn(form))}
-            addedM={addedMembers} memberIn={memberInput}
-            setMemberIn={v => { setMemberInput(v); setMemberInputError(''); }}
-            memberErr={memberInputError} memberLoading={memberInputLoading}
-            onAddMember={handleAddMember} onRemoveMember={handleRemoveMember}
-            onToggleGenre={toggleGenre} onToggleGen={toggleGeneration}
-            rosters={numberRosters}
-          />
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); setMemberInput(''); }}
-              className="text-xs px-3 py-1.5 text-white/40 hover:text-white/60">キャンセル</button>
-            <button onClick={handleCreate}
-              className="text-xs px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">
-              作成
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 練習一覧 */}
-      {sessions.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-white/30 text-sm">練習がまだありません</p>
-          <p className="text-white/20 text-xs mt-1">「+ 練習を追加」から作成してください</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {Object.entries(groupedSessions).map(([groupName, groupSessions]) => {
-            const isExpanded = expandedGroups[groupName];
-            const hasEvent = groupSessions.some(s => s.type === 'event');
-
-            return (
-              <div key={groupName} className="bg-white/[0.04] border border-white/[0.06] rounded-xl overflow-hidden">
-                <button
-                  onClick={() => toggleGroup(groupName)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/[0.06] transition-colors text-left"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      {hasEvent ? (
-                        <span className="text-[10px] px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練含</span>
-                      ) : (
-                        <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>
-                      )}
-                      <span className="text-xs text-white/40">{groupSessions.length}件の日程</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white truncate">{groupName}</h3>
-                  </div>
-                  <div className="text-white/30 text-sm font-medium">
-                    {isExpanded ? '▲ 閉じる' : '▼ 展開する'}
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-white/[0.06] p-4 bg-[#141824] space-y-4">
-                    {/* CSVエクスポートボタン領域 */}
-                    <div className="flex justify-between items-center bg-white/[0.02] p-3 rounded-lg border border-white/[0.04] mb-2">
-                      <span className="text-xs text-white/50">プロジェクト全体の出欠状況（Excel出力可）</span>
-                      <Link href={`/practices/group/${encodeURIComponent(groupName)}`} className="text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-3 py-1.5 rounded-lg transition-colors border border-emerald-500/30 font-bold whitespace-nowrap">
-                        📋 出欠一覧・CSV出力
-                      </Link>
-                    </div>
-
-                    {groupSessions.map((session, index) => {
-                      const currentRSVP = myRSVPs[session.id];
-                      const editedRSVP = editingRSVPs[session.id];
-                      const status = editedRSVP?.status || currentRSVP?.status || '';
-                      const note = editedRSVP?.note ?? (currentRSVP?.note || '');
-
-                      return (
-                        <div key={session.id} className={`${index > 0 ? 'border-t border-white/[0.04] pt-4' : ''}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <p className="text-sm font-medium text-white">{session.date} <span className="text-white/60 text-xs ml-2">{session.startTime}{session.endTime ? `〜${session.endTime}` : ''}</span></p>
-                              {session.location && <p className="text-xs text-white/30 mt-0.5">{session.location}</p>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Link href={`/practices/${session.id}`} className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded hover:bg-blue-500/20 mr-2">詳細/参加状況 ➔</Link>
-                              
-                              <div className="flex items-center gap-3">
-                                {/* 編集・削除 */}
-                                <button onClick={() => openEdit(session)} className="text-xs text-white/30 hover:text-blue-400">編集</button>
-                                <button onClick={() => handleDelete(session)} className="text-xs text-white/20 hover:text-red-400">削除</button>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* 出欠入力UI */}
-                          <div className="flex flex-col gap-2 mt-3">
-                            <div className="flex gap-2">
-                              {(['GO', 'NO', 'LATE', 'EARLY']).map(s => (
-                                <button
-                                  key={s}
-                                  onClick={() => handleBulkRSVPChange(session.id, s, note)}
-                                  className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border transition-colors ${status === s ? STATUS_COLORS[s] : 'bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08]'}`}
-                                >
-                                  {STATUS_LABELS[s]}
-                                </button>
-                              ))}
-                            </div>
-                            {(status === 'LATE' || status === 'EARLY' || status === 'NO') && (
-                              <input
-                                type="text"
-                                placeholder={`理由（任意）`}
-                                value={note}
-                                onChange={e => handleBulkRSVPChange(session.id, status, e.target.value)}
-                                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-md px-3 py-1.5 text-xs text-white placeholder:text-white/20 focus:outline-none"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* 一括保存ボタン */}
-                    <div className="pt-4 mt-2 border-t border-white/[0.08] flex justify-end">
-                      <button
-                        onClick={() => saveBulkRSVPs(groupName, groupSessions)}
-                        disabled={bulkSaving || !groupSessions.some(s => editingRSVPs[s.id])}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-500/20 transition-all"
-                      >
-                        {bulkSaving ? '保存中...' : '変更をまとめて保存'}
-                      </button>
-                    </div>
-                  </div>
+          <div className="space-y-3 bg-black/20 p-4 rounded-lg border border-white/[0.04]">
+            <label className="text-[11px] text-white/30 block mb-1">【複数の日程を一括追加】</label>
+            {form.schedules.map((sch, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <input type="date" value={sch.date} onChange={e => {
+                    const next = [...form.schedules]; next[i].date = e.target.value; setForm({ ...form, schedules: next });
+                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div className="w-[80px]">
+                  <input type="time" value={sch.startTime} onChange={e => {
+                    const next = [...form.schedules]; next[i].startTime = e.target.value; next[i].endTime = addTwoHours(e.target.value); setForm({ ...form, schedules: next });
+                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <span className="text-white/30 pt-2">〜</span>
+                <div className="w-[80px]">
+                  <input type="time" value={sch.endTime} onChange={e => {
+                    const next = [...form.schedules]; next[i].endTime = e.target.value; setForm({ ...form, schedules: next });
+                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                {form.schedules.length > 1 && (
+                  <button onClick={() => setForm({ ...form, schedules: form.schedules.filter((_, idx) => idx !== i) })} className="pt-2 px-1 text-white/20 hover:text-red-400">×</button>
                 )}
               </div>
-            );
-          })}
+            ))}
+            <button onClick={() => setForm({ ...form, schedules: [...form.schedules, { date: '', startTime: '19:00', endTime: '21:00' }] })} className="text-xs font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-2 rounded-lg w-full transition-colors mt-2">
+              + 別の日程枠を追加
+            </button>
+          </div>
+
+          <input type="text" placeholder="場所（プロジェクト全体で共通）" value={form.location}
+            onChange={e => setForm({ ...form, location: e.target.value })}
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50" />
+
+          <textarea placeholder="メモ（任意）" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })}
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none resize-none" rows={2} />
+
+          <TargetForm f={form} setF={(fn:any) => setForm(fn(form))} addedM={addedMembers} memberIn={memberInput}
+            setMemberIn={(v:string) => { setMemberInput(v); setMemberInputError(''); }} memberErr={memberInputError} memberLoading={memberInputLoading}
+            onAddMember={handleAddMember} onRemoveMember={handleRemoveMember} onToggleGenre={toggleGenre} onToggleGen={toggleGeneration} rosters={numberRosters} />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.08]">
+            <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setAddedMembers([]); }} className="text-xs font-bold px-4 py-2 text-white/40 hover:text-white/60 transition-colors">キャンセル</button>
+            <button onClick={handleCreate} disabled={isCreating} className="text-xs font-bold px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-900 disabled:opacity-50 text-white rounded-lg transition-colors shadow-lg shadow-blue-500/20">{isCreating ? '作成中...' : '作成する'}</button>
+          </div>
         </div>
       )}
 
-      {/* ===== 編集モーダル ===== */}
-      {editingSession && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingSession(null)} />
-          <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-base font-bold text-white">練習を編集</h2>
-
-            <div className="flex gap-2">
-              {(['regular', 'event'] as const).map(t => (
-                <button key={t} type="button" onClick={() => setEditForm(f => ({ ...f, type: t }))}
-                  className={`flex-1 py-2 text-xs rounded-lg border transition-colors ${editForm.type === t ? (t === 'regular' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30') : 'bg-white/[0.04] text-white/40 border-white/[0.08]'}`}>
-                  {t === 'regular' ? '正規練' : 'イベント練'}
-                </button>
-              ))}
-            </div>
-
-            <input type="text" placeholder="練習名" value={editForm.name}
-              onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50" />
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">日付</label>
-                <input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-              </div>
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">開始</label>
-                <input type="time" value={editForm.startTime} onChange={e => {
-                  const start = e.target.value;
-                  setEditForm(f => ({ ...f, startTime: start, endTime: addTwoHours(start) }));
-                }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-              </div>
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">終了</label>
-                <input type="time" value={editForm.endTime} onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-              </div>
-            </div>
-
-            <input type="text" placeholder="場所" value={editForm.location}
-              onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
-              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
-
-            <textarea placeholder="メモ（任意）" value={editForm.note}
-              onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
-              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none resize-none" rows={2} />
-
-            <TargetForm
-              f={editForm} setF={fn => setEditForm(fn(editForm))}
-              addedM={editAddedMembers} memberIn={editMemberInput}
-              setMemberIn={v => { setEditMemberInput(v); setEditMemberError(''); }}
-              memberErr={editMemberError} memberLoading={editMemberLoading}
-              onAddMember={handleEditAddMember} onRemoveMember={handleEditRemoveMember}
-              onToggleGenre={toggleEditGenre} onToggleGen={toggleEditGen}
-              rosters={numberRosters}
-            />
-
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => setEditingSession(null)}
-                className="flex-1 py-2.5 text-sm text-white/40 hover:text-white/60 bg-white/[0.04] rounded-xl transition-colors">
-                キャンセル
-              </button>
-              <button onClick={handleEditSave} disabled={editSaving}
-                className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-xl transition-colors">
-                {editSaving ? '保存中...' : '保存'}
-              </button>
-            </div>
-          </div>
+      {sessions.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-white/30 text-sm">練習プロジェクトがまだありません</p>
+          <p className="text-white/20 text-xs mt-2">「+ プロジェクトを追加」ボタンから作成できます</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(groupedSessions).map(([groupName, groupSessions]) => {
+            const hasEvent = groupSessions.some(s => s.type === 'event');
+            return (
+              <Link key={groupName} href={`/practices/project/${encodeURIComponent(groupName)}`} className="block bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden hover:bg-white/[0.08] hover:border-white/[0.2] transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-black/20">
+                <div className="w-full flex flex-col justify-between p-5 min-h-[110px]">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {hasEvent ? <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span> : <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>}
+                      <span className="text-xs font-bold text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded-full">{groupSessions.length}件の日程</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white truncate group-hover:text-blue-200 transition-colors">{groupName}</h3>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between text-white/30 text-xs font-medium group-hover:text-blue-400 transition-colors border-t border-white/[0.04] pt-3">
+                    <span>タップして全日程を表示</span>
+                    <span className="text-lg">➔</span>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
