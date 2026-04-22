@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import UserMenu from "./UserMenu";
+import BoiledLogo from "./BoiledLogo";
 
-interface HeaderProps {
-  circleName?: string;
-}
-
-export default function Header({ circleName = "BOILED" }: HeaderProps) {
+export default function Header() {
   const pathname = usePathname();
 
   const navLinks = [
@@ -24,10 +21,8 @@ export default function Header({ circleName = "BOILED" }: HeaderProps) {
       <div className="container mx-auto px-4 md:px-8 py-4 md:py-5">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/profile" className="group">
-            <span className="text-xl md:text-2xl font-black tracking-wider text-white">
-              {circleName}
-            </span>
+          <Link href="/profile">
+            <BoiledLogo size="sm" />
           </Link>
 
           {/* Desktop Navigation */}
