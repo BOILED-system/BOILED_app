@@ -277,7 +277,7 @@ export async function updatePaymentStatus(
 
 export async function updateSettlement(
   id: string,
-  data: Partial<Pick<Settlement, 'title' | 'amount' | 'dueDate' | 'note' | 'paymentMethods' | 'bankInfo' | 'paypayInfo' | 'cashCollectors' | 'requiresConfirmation'>>,
+  data: Partial<Pick<Settlement, 'title' | 'amount' | 'dueDate' | 'note' | 'paymentMethods' | 'bankInfo' | 'paypayInfo' | 'cashCollectors' | 'requiresConfirmation' | 'resolvedMemberIds'>>,
 ): Promise<void> {
   await apiPut(`/api/settlements/${id}`, data);
 }

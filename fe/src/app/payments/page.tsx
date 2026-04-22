@@ -85,6 +85,7 @@ export default function PaymentsPage() {
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [editForm, setEditForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
   const [editNewMembers, setEditNewMembers] = useState<{ id: string; name: string }[]>([]);
+  const [editRemovedMemberIds, setEditRemovedMemberIds] = useState<string[]>([]);
   const [editCashCollectorInput, setEditCashCollectorInput] = useState('');
   const [editCashCollectorError, setEditCashCollectorError] = useState('');
   const [editCashCollectorLoading, setEditCashCollectorLoading] = useState(false);
@@ -274,6 +275,7 @@ export default function PaymentsPage() {
       cashCollectors: s.cashCollectors ?? [], requiresConfirmation: s.requiresConfirmation ?? false,
     });
     setEditNewMembers([]);
+    setEditRemovedMemberIds([]);
     setEditCashCollectorInput(''); setEditCashCollectorError('');
   };
 
@@ -294,13 +296,16 @@ export default function PaymentsPage() {
     if (!editForm.title || !editForm.amount || !editForm.dueDate) { alert('タイトル・金額・期限は必須です'); return; }
     setSaving(true);
     try {
-      const newResolvedIds = editNewMembers.map(m => m.id).filter(
-        id => !(editingSettlement.resolvedMemberIds ?? []).includes(id)
-      );
+      const existingIds = editingSettlement.resolvedMemberIds ?? [];
+      const newResolvedIds = editNewMembers.map(m => m.id).filter(id => !existingIds.includes(id));
+      const finalResolvedIds = existingIds
+        .filter(id => !editRemovedMemberIds.includes(id))
+        .concat(newResolvedIds);
       await updateSettlement(editingSettlement.id, {
         title: editForm.title, amount: Number(editForm.amount), dueDate: editForm.dueDate, note: editForm.note,
         paymentMethods: editForm.paymentMethods, bankInfo: editForm.bankInfo, paypayInfo: editForm.paypayInfo,
         cashCollectors: editForm.cashCollectors, requiresConfirmation: editForm.requiresConfirmation,
+        resolvedMemberIds: finalResolvedIds,
       });
       await Promise.all(
         editNewMembers
@@ -314,7 +319,7 @@ export default function PaymentsPage() {
               title: editForm.title, amount: Number(editForm.amount), dueDate: editForm.dueDate, note: editForm.note,
               paymentMethods: editForm.paymentMethods, bankInfo: editForm.bankInfo, paypayInfo: editForm.paypayInfo,
               cashCollectors: editForm.cashCollectors, requiresConfirmation: editForm.requiresConfirmation,
-              resolvedMemberIds: [...(s.resolvedMemberIds ?? []), ...newResolvedIds],
+              resolvedMemberIds: finalResolvedIds,
             }
           : s
       ));
@@ -323,7 +328,8 @@ export default function PaymentsPage() {
         const newPayments = editNewMembers
           .filter(m => newResolvedIds.includes(m.id))
           .map(m => ({ memberId: m.id, name: m.name, status: 'unpaid' as const, confirmedAt: null }));
-        return { ...prev, [editingSettlement.id]: [...prev[editingSettlement.id], ...newPayments] };
+        const retained = prev[editingSettlement.id].filter(p => !editRemovedMemberIds.includes(p.memberId));
+        return { ...prev, [editingSettlement.id]: [...retained, ...newPayments] };
       });
       setEditingSettlement(null);
     } catch {
@@ -399,8 +405,12 @@ export default function PaymentsPage() {
 
   const handleDeleteSettlement = async (s: Settlement) => {
     if (!confirm(`「${s.title}」を削除しますか？`)) return;
-    await deleteSettlement(s.id);
-    setAllSettlements(prev => prev.filter(x => x.id !== s.id));
+    try {
+      await deleteSettlement(s.id);
+      setAllSettlements(prev => prev.filter(x => x.id !== s.id));
+    } catch {
+      alert('削除に失敗しました。もう一度お試しください。');
+    }
   };
 
   // ===== CSV download =====
@@ -1034,11 +1044,42 @@ export default function PaymentsPage() {
               )}
             </div>
 
+            {/* 対象者を外す */}
+            {(editingSettlement?.resolvedMemberIds?.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                <label className="text-[11px] text-white/30 block">対象者を外す</label>
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                  {(editingSettlement?.resolvedMemberIds ?? []).map(id => {
+                    const u = allUsers.find(u => u.memberId === id);
+                    const name = u?.name ?? id;
+                    const removed = editRemovedMemberIds.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => setEditRemovedMemberIds(prev =>
+                          removed ? prev.filter(x => x !== id) : [...prev, id]
+                        )}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${removed ? 'bg-red-500/20 text-red-400 border-red-500/30 line-through opacity-60' : 'bg-white/[0.06] text-white/60 border-white/[0.08] hover:border-red-500/30 hover:text-red-400'}`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {editRemovedMemberIds.length > 0 && (
+                  <p className="text-[11px] text-red-400/70">{editRemovedMemberIds.length}人を対象から外します</p>
+                )}
+              </div>
+            )}
+
             {/* 対象者追加 */}
             <div className="space-y-2">
               <label className="text-[11px] text-white/30 block">対象者を追加</label>
               <MemberSelectDropdown
-                allUsers={allUsers}
+                allUsers={allUsers.filter(u =>
+                  !(editingSettlement?.resolvedMemberIds ?? []).includes(u.memberId as string) ||
+                  editRemovedMemberIds.includes(u.memberId as string)
+                )}
                 selected={editNewMembers}
                 onAdd={m => setEditNewMembers(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m])}
                 onRemove={id => setEditNewMembers(prev => prev.filter(m => m.id !== id))}

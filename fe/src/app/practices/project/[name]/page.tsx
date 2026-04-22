@@ -9,10 +9,12 @@ import {
   updatePracticeSession,
   deletePracticeSession,
   getNumberRosters,
+  getAllUsers,
   getUser,
   submitRSVP,
 } from '@/lib/api';
-import type { PracticeSession, NumberRoster, TargetType } from '@/lib/api';
+import type { PracticeSession, NumberRoster, TargetType, FEUser } from '@/lib/api';
+import MemberSelectDropdown from '@/components/MemberSelectDropdown';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 const GENERATIONS = [16, 17];
@@ -35,6 +37,8 @@ const EMPTY_FORM = {
   type: 'regular' as 'regular' | 'event' | 'team', targetType: 'genre_generation' as TargetType,
   targetGenres: [] as string[], targetGenerations: [] as number[],
   targetNumberId: '', targetMemberIds: [] as string[],
+  additionalMemberIds: [] as string[],
+  excludedMemberIds: [] as string[],
 };
 
 export default function ProjectRSVPPage({ params }: { params: { name: string } }) {
@@ -50,12 +54,15 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const [userRole, setUserRole] = useState('');
   const [memberId, setMemberId] = useState('');
   const [numberRosters, setNumberRosters] = useState<NumberRoster[]>([]);
+  const [allUsers, setAllUsers] = useState<FEUser[]>([]);
 
   // 編集モーダルステート
   const [editingSession, setEditingSession] = useState<PracticeSession | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [editSaving, setEditSaving] = useState(false);
   const [editAddedMembers, setEditAddedMembers] = useState<{ id: string; name: string }[]>([]);
+  const [editAdditionalMembers, setEditAdditionalMembers] = useState<{ id: string; name: string }[]>([]);
+  const [editExcludedMembers, setEditExcludedMembers] = useState<{ id: string; name: string }[]>([]);
   const [editMemberInput, setEditMemberInput] = useState('');
   const [editMemberError, setEditMemberError] = useState('');
   const [editMemberLoading, setEditMemberLoading] = useState(false);
@@ -70,11 +77,13 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
   const load = async (mid: string) => {
     try {
-      const [allSessions, rosters] = await Promise.all([
+      const [allSessions, rosters, users] = await Promise.all([
         getPracticeSessions(),
         getNumberRosters(),
+        getAllUsers(),
       ]);
       setNumberRosters(rosters);
+      setAllUsers(users);
 
       const matched = allSessions
         .filter(s => s.name === groupName)
@@ -142,21 +151,26 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   // ===== 編集・削除 =====
   const openEdit = (s: PracticeSession) => {
     setEditingSession(s);
+    const toMember = (id: string) => {
+      const u = allUsers.find(u => u.memberId === id);
+      return { id, name: u?.name || id };
+    };
     setEditForm({
       name: s.name, date: s.date, startTime: s.startTime, endTime: s.endTime || '',
       location: s.location || '', note: s.note || '', type: s.type || 'regular',
       targetType: s.targetType || 'genre_generation',
       targetGenres: s.targetGenres || [], targetGenerations: s.targetGenerations || [],
       targetNumberId: s.targetNumberId || '', targetMemberIds: s.targetMemberIds || [],
+      additionalMemberIds: s.additionalMemberIds || [],
+      excludedMemberIds: s.excludedMemberIds || [],
     });
     if (s.targetType === 'individual' && s.targetMemberIds?.length) {
-      Promise.all(s.targetMemberIds.map(async mid => {
-        const u = await getUser(mid);
-        return { id: mid, name: u?.name as string || mid };
-      })).then(setEditAddedMembers);
+      setEditAddedMembers(s.targetMemberIds.map(toMember));
     } else {
       setEditAddedMembers([]);
     }
+    setEditAdditionalMembers((s.additionalMemberIds || []).map(toMember));
+    setEditExcludedMembers((s.excludedMemberIds || []).map(toMember));
     setEditMemberInput(''); setEditMemberError('');
   };
 
@@ -170,6 +184,8 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       type: editForm.type, targetType: editForm.targetType,
       targetGenres: editForm.targetGenres, targetGenerations: editForm.targetGenerations,
       targetNumberId: editForm.targetNumberId, targetMemberIds: editForm.targetMemberIds,
+      additionalMemberIds: editForm.additionalMemberIds,
+      excludedMemberIds: editForm.excludedMemberIds,
     });
     setGroupSessions(prev => prev.map(s => s.id === editingSession.id ? { ...s, ...editForm } : s));
     setEditSaving(false);
@@ -342,6 +358,44 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
             <input type="text" placeholder="場所" value={editForm.location}
               onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
               className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
+
+            <div className="space-y-2 border-t border-white/[0.08] pt-4">
+              <label className="text-[11px] text-white/30 block">追加メンバー（任意）</label>
+              <p className="text-[10px] text-white/20">対象外でも個別に追加できます</p>
+              <MemberSelectDropdown
+                allUsers={allUsers.filter(u => !editAdditionalMembers.find(m => m.id === u.memberId))}
+                selected={editAdditionalMembers}
+                onAdd={m => {
+                  setEditAdditionalMembers(prev => [...prev, m]);
+                  setEditForm(f => ({ ...f, additionalMemberIds: [...f.additionalMemberIds, m.id] }));
+                }}
+                onRemove={id => {
+                  setEditAdditionalMembers(prev => prev.filter(m => m.id !== id));
+                  setEditForm(f => ({ ...f, additionalMemberIds: f.additionalMemberIds.filter(x => x !== id) }));
+                }}
+                chipColor="green"
+                placeholder="追加するメンバーを選択..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] text-white/30 block">除外メンバー（任意）</label>
+              <p className="text-[10px] text-white/20">対象でも個別に外せます</p>
+              <MemberSelectDropdown
+                allUsers={allUsers.filter(u => !editExcludedMembers.find(m => m.id === u.memberId))}
+                selected={editExcludedMembers}
+                onAdd={m => {
+                  setEditExcludedMembers(prev => [...prev, m]);
+                  setEditForm(f => ({ ...f, excludedMemberIds: [...f.excludedMemberIds, m.id] }));
+                }}
+                onRemove={id => {
+                  setEditExcludedMembers(prev => prev.filter(m => m.id !== id));
+                  setEditForm(f => ({ ...f, excludedMemberIds: f.excludedMemberIds.filter(x => x !== id) }));
+                }}
+                chipColor="red"
+                placeholder="除外するメンバーを選択..."
+              />
+            </div>
 
             <div className="flex gap-2 pt-4 border-t border-white/[0.08]">
               <button onClick={() => setEditingSession(null)}

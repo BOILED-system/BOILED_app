@@ -52,18 +52,31 @@ func (r *fePracticeRSVPRepository) GetBySession(ctx context.Context, sessionID s
 }
 
 func (r *fePracticeRSVPRepository) GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error) {
-	docs, err := r.client.CollectionGroup("rsvps").Where("memberId", "==", memberID).Documents(ctx).GetAll()
+	sessionDocs, err := r.client.Collection(fePracticeSessionCollection).Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[string]*domain.FEPracticeRSVP, len(docs))
-	for _, doc := range docs {
+	refs := make([]*firestore.DocumentRef, 0, len(sessionDocs))
+	for _, sd := range sessionDocs {
+		refs = append(refs, r.client.Collection(fePracticeSessionCollection).Doc(sd.Ref.ID).Collection("rsvps").Doc(memberID))
+	}
+	if len(refs) == 0 {
+		return map[string]*domain.FEPracticeRSVP{}, nil
+	}
+	rsvpDocs, err := r.client.GetAll(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]*domain.FEPracticeRSVP)
+	for i, doc := range rsvpDocs {
+		if !doc.Exists() {
+			continue
+		}
 		var rsvp domain.FEPracticeRSVP
 		if err := doc.DataTo(&rsvp); err != nil {
 			continue
 		}
-		sessionID := doc.Ref.Parent.Parent.ID
-		result[sessionID] = &rsvp
+		result[sessionDocs[i].Ref.ID] = &rsvp
 	}
 	return result, nil
 }
