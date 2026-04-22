@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getUser } from "@/lib/api";
+import BoiledLogo from "@/components/BoiledLogo";
 
 export default function Home() {
   const [memberId, setMemberId] = useState("");
@@ -36,7 +37,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-8">
-      <h1 className="text-4xl font-bold">BOILED</h1>
+      <BoiledLogo size="lg" />
       <p className="text-gray-400">会員番号を入力してログイン</p>
       <input
         type="text"
