@@ -8,6 +8,8 @@ import {
   getSessionRSVPs,
   submitRSVP,
   getUser,
+  getNumberRosters,
+  isSessionForMember,
 } from '@/lib/api';
 import type { PracticeSession, PracticeRSVP } from '@/lib/api';
 
@@ -49,7 +51,16 @@ export default function AttendancePage() {
 
   const load = async (mid: string, role: string) => {
     try {
-      const sessions = await getPracticeSessions();
+      const [allSessions, rosters, user] = await Promise.all([
+        getPracticeSessions(),
+        getNumberRosters(),
+        mid ? getUser(mid) : Promise.resolve(null),
+      ]);
+      const genre = user?.genre || '';
+      const generation = user?.generation || 0;
+      const sessions = role === 'admin'
+        ? allSessions
+        : allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
       const today = new Date().toISOString().split('T')[0];
       const upcoming = sessions
         .filter(s => s.date >= today)
