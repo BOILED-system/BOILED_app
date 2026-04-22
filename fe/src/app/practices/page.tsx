@@ -7,6 +7,8 @@ import {
   createPracticeSession,
   getNumberRosters,
   getAllUsers,
+  getUser,
+  isSessionForMember,
 } from '@/lib/api';
 import type { PracticeSession, NumberRoster, TargetType, FEUser } from '@/lib/api';
 import MemberSelectDropdown from '@/components/MemberSelectDropdown';
@@ -59,14 +61,20 @@ export default function PracticesPage() {
 
   const load = async (mid: string, role: string) => {
     try {
-      const [allSessions, rosters, users] = await Promise.all([
+      const [allSessions, rosters, users, user] = await Promise.all([
         getPracticeSessions(),
         getNumberRosters(),
         getAllUsers(),
+        mid ? getUser(mid) : Promise.resolve(null),
       ]);
       setNumberRosters(rosters);
       setAllUsers(users);
-      setSessions(allSessions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      const genre = user?.genre || '';
+      const generation = user?.generation || 0;
+      const filtered = role === 'admin'
+        ? allSessions
+        : allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
+      setSessions(filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     } catch (e) {
       console.error(e);
     } finally {
