@@ -115,6 +115,8 @@ func (h *FEHandler) CreatePracticeSession(w http.ResponseWriter, r *http.Request
 		TargetMemberIDs:     req.TargetMemberIDs,
 		AdditionalMemberIDs: req.AdditionalMemberIDs,
 		ExcludedMemberIDs:   req.ExcludedMemberIDs,
+		CreatedBy:           req.CreatedBy,
+		CreatedByName:       req.CreatedByName,
 	}
 	if err := h.interactor.CreatePracticeSession(r.Context(), s); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -301,6 +303,8 @@ func (h *FEHandler) CreateEventFE(w http.ResponseWriter, r *http.Request) {
 		Timetable:       req.Timetable,
 		Note:            req.Note,
 		ImageURLs:       []string{},
+		CreatedBy:       req.CreatedBy,
+		CreatedByName:   req.CreatedByName,
 	}
 	if err := h.interactor.CreateEvent(r.Context(), e); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

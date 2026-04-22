@@ -20,6 +20,8 @@ type CreatePracticeSessionFERequest struct {
 	TargetMemberIDs     []string `json:"targetMemberIds"`
 	AdditionalMemberIDs []string `json:"additionalMemberIds"`
 	ExcludedMemberIDs   []string `json:"excludedMemberIds"`
+	CreatedBy           string   `json:"createdBy"`
+	CreatedByName       string   `json:"createdByName"`
 }
 
 type SubmitRSVPFERequest struct {
@@ -53,6 +55,8 @@ type CreateEventFERequest struct {
 	MeetingLocation string               `json:"meetingLocation"`
 	Timetable       []domain.TimetableRow `json:"timetable"`
 	Note            string               `json:"note"`
+	CreatedBy       string               `json:"createdBy"`
+	CreatedByName   string               `json:"createdByName"`
 }
 
 // ===== Settlements =====

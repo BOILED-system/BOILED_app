@@ -20,6 +20,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<BoiledEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
+  const [memberId, setMemberId] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [timetable, setTimetable] = useState<TimetableRow[]>([]);
@@ -28,6 +29,7 @@ export default function EventsPage() {
 
   useEffect(() => {
     setUserRole(localStorage.getItem('userRole') || 'member');
+    setMemberId(localStorage.getItem('memberId') || '');
     load();
   }, []);
 
@@ -54,7 +56,7 @@ export default function EventsPage() {
       return;
     }
     setSaving(true);
-    await createEvent({ ...form, timetable });
+    await createEvent({ ...form, timetable, createdBy: memberId, createdByName: localStorage.getItem('userName') || '' });
     setForm(EMPTY_FORM);
     setTimetable([]);
     setTimetableInput({ time: '', description: '' });
@@ -206,7 +208,7 @@ export default function EventsPage() {
                   </div>
                   <span className="text-white/20 group-hover:text-blue-400 transition-colors text-sm">→</span>
                 </Link>
-                {userRole === 'admin' && (
+                {userRole === 'admin' && (!event.createdBy || event.createdBy === memberId) && (
                   <button onClick={e => handleDelete(e, event.id, event.title)}
                     className="absolute top-1/2 -translate-y-1/2 right-10 opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all text-xs px-2 py-1">
                     削除
