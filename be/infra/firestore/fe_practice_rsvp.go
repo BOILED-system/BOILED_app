@@ -50,3 +50,20 @@ func (r *fePracticeRSVPRepository) GetBySession(ctx context.Context, sessionID s
 	}
 	return rsvps, nil
 }
+
+func (r *fePracticeRSVPRepository) GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error) {
+	docs, err := r.client.CollectionGroup("rsvps").Where("memberId", "==", memberID).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]*domain.FEPracticeRSVP, len(docs))
+	for _, doc := range docs {
+		var rsvp domain.FEPracticeRSVP
+		if err := doc.DataTo(&rsvp); err != nil {
+			continue
+		}
+		sessionID := doc.Ref.Parent.Parent.ID
+		result[sessionID] = &rsvp
+	}
+	return result, nil
+}

@@ -185,6 +185,17 @@ func (h *FEHandler) GetMyRSVP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, rsvp)
 }
 
+// GetMyRSVPs handles GET /api/members/{memberId}/rsvps
+func (h *FEHandler) GetMyRSVPs(w http.ResponseWriter, r *http.Request) {
+	memberID := r.PathValue("memberId")
+	rsvps, err := h.interactor.GetMyRSVPs(r.Context(), memberID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rsvps)
+}
+
 // GetSessionRSVPs handles GET /api/practice-sessions/{id}/rsvps
 func (h *FEHandler) GetSessionRSVPs(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("id")

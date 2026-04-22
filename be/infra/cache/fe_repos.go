@@ -151,6 +151,19 @@ func (r *cachedFEPracticeRSVPRepo) GetBySessionAndMember(ctx context.Context, se
 	return rsvp, nil
 }
 
+func (r *cachedFEPracticeRSVPRepo) GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error) {
+	key := fmt.Sprintf("rsvps:member:%s", memberID)
+	if v, ok := r.store.Get(key); ok {
+		return v.(map[string]*domain.FEPracticeRSVP), nil
+	}
+	rsvps, err := r.inner.GetByMember(ctx, memberID)
+	if err != nil {
+		return nil, err
+	}
+	r.store.Set(key, rsvps, MemberRSVPTTL)
+	return rsvps, nil
+}
+
 func (r *cachedFEPracticeRSVPRepo) Upsert(ctx context.Context, sessionID string, rsvp *domain.FEPracticeRSVP) error {
 	if err := r.inner.Upsert(ctx, sessionID, rsvp); err != nil {
 		return err
@@ -158,6 +171,7 @@ func (r *cachedFEPracticeRSVPRepo) Upsert(ctx context.Context, sessionID string,
 	r.store.Delete(
 		fmt.Sprintf("rsvps:session:%s", sessionID),
 		fmt.Sprintf("rsvps:session:%s:member:%s", sessionID, rsvp.MemberID),
+		fmt.Sprintf("rsvps:member:%s", rsvp.MemberID),
 	)
 	return nil
 }

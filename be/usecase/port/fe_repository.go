@@ -28,6 +28,7 @@ type FEPracticeRSVPRepository interface {
 	Upsert(ctx context.Context, sessionID string, rsvp *domain.FEPracticeRSVP) error
 	GetBySessionAndMember(ctx context.Context, sessionID, memberID string) (*domain.FEPracticeRSVP, error)
 	GetBySession(ctx context.Context, sessionID string) ([]*domain.FEPracticeRSVP, error)
+	GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error)
 }
 
 // NumberRosterRepository defines number roster data access.

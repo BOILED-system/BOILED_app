@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   getPracticeSessions,
-  getMyRSVP,
+  getMyRSVPs,
   updatePracticeSession,
   deletePracticeSession,
   getNumberRosters,
@@ -82,11 +82,12 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       setGroupSessions(matched);
 
       if (mid && matched.length > 0) {
+        const allRSVPs = await getMyRSVPs(mid);
         const rsvpMap: Record<string, { status: string; note: string }> = {};
-        await Promise.all(matched.map(async s => {
-          const rsvp = await getMyRSVP(s.id, mid);
+        for (const s of matched) {
+          const rsvp = allRSVPs[s.id];
           if (rsvp) rsvpMap[s.id] = { status: rsvp.status, note: rsvp.note || '' };
-        }));
+        }
         setMyRSVPs(rsvpMap);
       }
     } catch (e) {

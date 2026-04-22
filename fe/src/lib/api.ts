@@ -157,6 +157,10 @@ export async function getMyRSVP(sessionId: string, memberId: string): Promise<Pr
   }
 }
 
+export async function getMyRSVPs(memberId: string): Promise<Record<string, PracticeRSVP>> {
+  return apiGet<Record<string, PracticeRSVP>>(`/api/members/${memberId}/rsvps`);
+}
+
 export async function getSessionRSVPs(sessionId: string): Promise<PracticeRSVP[]> {
   return apiGet<PracticeRSVP[]>(`/api/practice-sessions/${sessionId}/rsvps`);
 }
@@ -329,14 +333,8 @@ export async function getUpcomingUnregisteredSessions(memberId: string): Promise
     return d >= today && d <= nextWeek;
   });
 
-  const results = await Promise.all(
-    upcoming.map(async session => {
-      const rsvp = await getMyRSVP(session.id, memberId);
-      return rsvp ? null : session;
-    })
-  );
-
-  return results.filter((s): s is PracticeSession => s !== null);
+  const myRSVPs = await getMyRSVPs(memberId);
+  return upcoming.filter(session => !myRSVPs[session.id]);
 }
 
 export async function getMyUnpaidSettlements(memberId: string): Promise<Settlement[]> {

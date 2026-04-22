@@ -27,6 +27,7 @@ func SetupFE(mux *http.ServeMux, feHandler *handler.FEHandler) {
 	mux.HandleFunc("GET /api/practice-sessions/{id}/rsvps", feHandler.GetSessionRSVPs)
 	mux.HandleFunc("POST /api/practice-sessions/{id}/rsvps", feHandler.SubmitRSVP)
 	mux.HandleFunc("GET /api/practice-sessions/{id}/rsvps/{memberId}", feHandler.GetMyRSVP)
+	mux.HandleFunc("GET /api/members/{memberId}/rsvps", feHandler.GetMyRSVPs)
 
 	// Number Rosters
 	mux.HandleFunc("GET /api/number-rosters", feHandler.GetNumberRosters)
