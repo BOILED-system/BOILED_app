@@ -225,3 +225,22 @@ func (i *FEInteractor) UpdateSettlement(ctx context.Context, id string, data map
 func (i *FEInteractor) DeleteSettlement(ctx context.Context, id string) error {
 	return i.settlementRepo.Delete(ctx, id)
 }
+
+func (i *FEInteractor) AddPaymentRecord(ctx context.Context, settlementID string, p *domain.FEPaymentRecord) error {
+	s, err := i.settlementRepo.GetByID(ctx, settlementID)
+	if err != nil {
+		return err
+	}
+	for _, id := range s.ResolvedMemberIDs {
+		if id == p.MemberID {
+			return nil // already in settlement
+		}
+	}
+	if err := i.paymentRepo.Create(ctx, settlementID, p); err != nil {
+		return err
+	}
+	newResolved := append(s.ResolvedMemberIDs, p.MemberID)
+	return i.settlementRepo.Update(ctx, settlementID, map[string]interface{}{
+		"resolvedMemberIds": newResolved,
+	})
+}

@@ -286,6 +286,10 @@ export async function deleteSettlement(settlementId: string): Promise<void> {
   await apiDelete(`/api/settlements/${settlementId}`);
 }
 
+export async function addPaymentRecord(settlementId: string, memberId: string, name: string): Promise<void> {
+  await apiPost(`/api/settlements/${settlementId}/payments`, { memberId, name });
+}
+
 // ===== Utility functions (moved from firestore.ts, now pure logic) =====
 
 export function isSessionForMember(

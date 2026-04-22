@@ -450,6 +450,30 @@ func (h *FEHandler) UpdateSettlementFE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// AddPaymentRecord handles POST /api/settlements/{id}/payments
+func (h *FEHandler) AddPaymentRecord(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req struct {
+		MemberID string `json:"memberId"`
+		Name     string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	p := &domain.FEPaymentRecord{
+		MemberID:    req.MemberID,
+		Name:        req.Name,
+		Status:      "unpaid",
+		ConfirmedAt: nil,
+	}
+	if err := h.interactor.AddPaymentRecord(r.Context(), id, p); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, p)
+}
+
 // DeleteSettlementFE handles DELETE /api/settlements/{id}
 func (h *FEHandler) DeleteSettlementFE(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

@@ -178,9 +178,24 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
   const handleDelete = async (s: PracticeSession) => {
     if (!confirm(`「${s.date}」の日程を削除しますか？`)) return;
-    await deletePracticeSession(s.id);
-    setGroupSessions(prev => prev.filter(x => x.id !== s.id));
-    if (groupSessions.length <= 1) router.back();
+    try {
+      await deletePracticeSession(s.id);
+      const next = groupSessions.filter(x => x.id !== s.id);
+      setGroupSessions(next);
+      if (next.length === 0) router.back();
+    } catch {
+      alert('削除に失敗しました。もう一度お試しください。');
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!confirm(`プロジェクト「${groupName}」の日程をすべて削除しますか？この操作は取り消せません。`)) return;
+    try {
+      await Promise.all(groupSessions.map(s => deletePracticeSession(s.id)));
+      router.back();
+    } catch {
+      alert('削除に失敗しました。もう一度お試しください。');
+    }
   };
 
   const handleEditAddMember = async () => { /* 略 */
@@ -216,6 +231,9 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white truncate">{groupName}</h1>
+        <button onClick={handleDeleteProject} className="text-xs text-red-400/60 hover:text-red-400 transition-colors px-2 py-1">
+          プロジェクトを削除
+        </button>
       </div>
 
       <div className="bg-[#141824] border border-white/[0.08] rounded-xl overflow-hidden p-4 space-y-6">
