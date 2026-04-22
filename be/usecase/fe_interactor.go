@@ -114,6 +114,10 @@ func (i *FEInteractor) GetMyRSVP(ctx context.Context, sessionID, memberID string
 	return i.rsvpRepo.GetBySessionAndMember(ctx, sessionID, memberID)
 }
 
+func (i *FEInteractor) GetMyRSVPs(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error) {
+	return i.rsvpRepo.GetByMember(ctx, memberID)
+}
+
 func (i *FEInteractor) GetSessionRSVPs(ctx context.Context, sessionID string) ([]*domain.FEPracticeRSVP, error) {
 	return i.rsvpRepo.GetBySession(ctx, sessionID)
 }

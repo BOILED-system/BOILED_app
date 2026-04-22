@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getPracticeSessions, getMyRSVP, getNumberRosters, getUser, isSessionForMember } from '@/lib/api';
+import { getPracticeSessions, getMyRSVPs, getNumberRosters, getUser, isSessionForMember } from '@/lib/api';
 import CalendarView from '@/components/CalendarView';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
@@ -28,10 +28,11 @@ export default function CalendarPage() {
 
   const load = async (memberId: string) => {
     try {
-      const [allSessions, rosters, user] = await Promise.all([
+      const [allSessions, rosters, user, myRSVPsMap] = await Promise.all([
         getPracticeSessions(),
         getNumberRosters(),
         memberId ? getUser(memberId) : Promise.resolve(null),
+        memberId ? getMyRSVPs(memberId) : Promise.resolve({} as Record<string, any>),
       ]);
 
       const role = localStorage.getItem('userRole') || 'member';
@@ -42,20 +43,18 @@ export default function CalendarPage() {
         ? allSessions
         : allSessions.filter(s => isSessionForMember(s, memberId, genre, generation, rosters));
 
-      const items = await Promise.all(
-        sessions.map(async (session: any) => {
-          const rsvp = memberId ? await getMyRSVP(session.id, memberId) : null;
-          const color = rsvp ? STATUS_COLORS[rsvp.status] : undefined;
-          return {
-            id: session.id,
-            title: session.name,
-            start: session.date,
-            type: session.type === 'event' ? 'event' : 'practice',
-            url: `/practices/${session.id}`,
-            color,
-          };
-        })
-      );
+      const items = sessions.map((session: any) => {
+        const rsvp = myRSVPsMap[session.id] ?? null;
+        const color = rsvp ? STATUS_COLORS[rsvp.status] : undefined;
+        return {
+          id: session.id,
+          title: session.name,
+          start: session.date,
+          type: session.type === 'event' ? 'event' : 'practice',
+          url: `/practices/${session.id}`,
+          color,
+        };
+      });
       setCalendarItems(items);
     } catch (e) {
       console.error(e);

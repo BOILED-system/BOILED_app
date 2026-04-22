@@ -7,6 +7,7 @@ import (
 )
 
 const DefaultTTL = 5 * time.Minute
+const MemberRSVPTTL = time.Hour
 
 type entry struct {
 	value     any

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   getPracticeSessions,
-  getMyRSVP,
+  getMyRSVPs,
   getSessionRSVPs,
   submitRSVP,
   getUser,
@@ -59,12 +59,11 @@ export default function AttendancePage() {
         .sort((a, b) => b.date.localeCompare(a.date));
       const sorted = [...upcoming, ...past];
 
+      const myRSVPsMap = mid ? await getMyRSVPs(mid) : {};
       const result = await Promise.all(
         sorted.map(async session => {
-          const [myRSVP, allRSVPs] = await Promise.all([
-            mid ? getMyRSVP(session.id, mid) : Promise.resolve(null),
-            role === 'admin' ? getSessionRSVPs(session.id) : Promise.resolve([]),
-          ]);
+          const myRSVP = myRSVPsMap[session.id] ?? null;
+          const allRSVPs = role === 'admin' ? await getSessionRSVPs(session.id) : [];
           return { session, myRSVP, allRSVPs };
         })
       );
