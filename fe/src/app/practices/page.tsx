@@ -56,10 +56,10 @@ export default function PracticesPage() {
     const mid = localStorage.getItem('memberId') || '';
     setUserRole(role);
     setMemberId(mid);
-    load(mid, role);
+    load(mid);
   }, []);
 
-  const load = async (mid: string, role: string) => {
+  const load = async (mid: string) => {
     try {
       const [allSessions, rosters, users, user] = await Promise.all([
         getPracticeSessions(),
@@ -71,9 +71,7 @@ export default function PracticesPage() {
       setAllUsers(users);
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
-      const filtered = role === 'admin'
-        ? allSessions
-        : allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
+      const filtered = allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
       setSessions(filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     } catch (e) {
       console.error(e);
@@ -104,7 +102,7 @@ export default function PracticesPage() {
     })));
     resetForm();
     setIsCreating(false);
-    load(memberId, userRole);
+    load(memberId);
   };
 
   const toggleGenre = (genre: string) => setForm(f => ({

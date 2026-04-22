@@ -58,9 +58,7 @@ export default function AttendancePage() {
       ]);
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
-      const sessions = role === 'admin'
-        ? allSessions
-        : allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
+      const sessions = allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
       const today = new Date().toISOString().split('T')[0];
       const upcoming = sessions
         .filter(s => s.date >= today)
