@@ -98,10 +98,13 @@ func (i *FEInteractor) SubmitRSVP(ctx context.Context, sessionID string, rsvp *d
 		return err
 	}
 
-	// Trigger Discord webhook dynamically using goroutine
+	// Trigger Discord webhook only for event practices submitted on the practice day (JST)
 	session, err := i.sessionRepo.GetByID(ctx, sessionID)
-	if err == nil && session != nil {
-		go discord.NotifyRSVP(context.Background(), session, oldRSVP, rsvp)
+	if err == nil && session != nil && session.Type == "event" {
+		today := time.Now().In(time.FixedZone("JST", 9*60*60)).Format("2006-01-02")
+		if session.Date == today {
+			go discord.NotifyRSVP(context.Background(), session, oldRSVP, rsvp)
+		}
 	}
 
 	return nil
