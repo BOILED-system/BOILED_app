@@ -28,6 +28,8 @@ type FEPracticeSession struct {
 	TargetMemberIDs      []string `json:"targetMemberIds" firestore:"targetMemberIds"`
 	AdditionalMemberIDs  []string `json:"additionalMemberIds" firestore:"additionalMemberIds"`
 	ExcludedMemberIDs    []string `json:"excludedMemberIds" firestore:"excludedMemberIds"`
+	CreatedBy            string   `json:"createdBy" firestore:"createdBy"`
+	CreatedByName        string   `json:"createdByName" firestore:"createdByName"`
 	CreatedAt            any      `json:"createdAt" firestore:"createdAt"`
 }
 
@@ -123,5 +125,7 @@ type FEEvent struct {
 	TimetableImageURL string         `json:"timetableImageUrl,omitempty" firestore:"timetableImageUrl,omitempty"`
 	Note              string         `json:"note" firestore:"note"`
 	ImageURLs         []string       `json:"imageUrls" firestore:"imageUrls"`
+	CreatedBy         string         `json:"createdBy" firestore:"createdBy"`
+	CreatedByName     string         `json:"createdByName" firestore:"createdByName"`
 	CreatedAt         any            `json:"createdAt" firestore:"createdAt"`
 }

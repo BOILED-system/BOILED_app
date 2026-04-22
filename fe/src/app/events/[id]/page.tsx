@@ -14,9 +14,11 @@ export default function EventDetailPage() {
   const [event, setEvent] = useState<BoiledEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
+  const [memberId, setMemberId] = useState('');
 
   useEffect(() => {
     setUserRole(localStorage.getItem('userRole') || 'member');
+    setMemberId(localStorage.getItem('memberId') || '');
     getEvent(id).then(e => {
       setEvent(e);
       setLoading(false);
@@ -63,7 +65,7 @@ export default function EventDetailPage() {
             <h1 className="text-xl font-bold text-white">{event.title}</h1>
             <p className="text-white/50 text-sm mt-1">{dateStr}</p>
           </div>
-          {userRole === 'admin' && (
+          {userRole === 'admin' && (!event.createdBy || event.createdBy === memberId) && (
             <Link href={`/events/${id}/edit`}
               className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors shrink-0">
               編集
@@ -134,7 +136,7 @@ export default function EventDetailPage() {
       )}
 
       {/* Admin: 削除 */}
-      {userRole === 'admin' && (
+      {userRole === 'admin' && (!event.createdBy || event.createdBy === memberId) && (
         <div className="flex justify-end">
           <button
             onClick={handleDelete}

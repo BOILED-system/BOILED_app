@@ -88,8 +88,11 @@ export default function PracticesPage() {
     if (validSchedules.length === 0) { alert('少なくとも1つの有効な日程（日付・開始時間）を追加してください'); return; }
     if (form.targetType === 'number' && !form.targetNumberId) { alert('ナンバー名簿を選択してください'); return; }
     setIsCreating(true);
+    const createdBy = memberId;
+    const createdByName = localStorage.getItem('userName') || '';
     await Promise.all(validSchedules.map(sch => createPracticeSession({
       ...form, date: sch.date, startTime: sch.startTime, endTime: sch.endTime, location: sch.location,
+      createdBy, createdByName,
     })));
     resetForm();
     setIsCreating(false);

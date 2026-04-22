@@ -41,6 +41,8 @@ export interface PracticeSession {
   targetMemberIds: string[];
   additionalMemberIds: string[];
   excludedMemberIds: string[];
+  createdBy?: string;
+  createdByName?: string;
   createdAt: any;
 }
 
@@ -72,6 +74,8 @@ export interface BoiledEvent {
   timetableImageUrl?: string;
   note: string;
   imageUrls: string[];
+  createdBy?: string;
+  createdByName?: string;
   createdAt: any;
 }
 

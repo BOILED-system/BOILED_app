@@ -118,6 +118,8 @@ export async function createPracticeSession(data: {
   targetMemberIds: string[];
   additionalMemberIds: string[];
   excludedMemberIds: string[];
+  createdBy?: string;
+  createdByName?: string;
 }): Promise<string> {
   const result = await apiPost<PracticeSession>('/api/practice-sessions', data);
   return result.id;
@@ -208,6 +210,8 @@ export async function createEvent(data: {
   meetingLocation: string;
   timetable: TimetableRow[];
   note: string;
+  createdBy?: string;
+  createdByName?: string;
 }): Promise<string> {
   const result = await apiPost<BoiledEvent>('/api/events', data);
   return result.id;
