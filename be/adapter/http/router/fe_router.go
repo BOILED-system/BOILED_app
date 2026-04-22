@@ -46,6 +46,7 @@ func SetupFE(mux *http.ServeMux, feHandler *handler.FEHandler) {
 	mux.HandleFunc("GET /api/settlements", feHandler.GetSettlements)
 	mux.HandleFunc("POST /api/settlements", feHandler.CreateSettlementFE)
 	mux.HandleFunc("GET /api/settlements/{id}/payments", feHandler.GetSettlementPayments)
+	mux.HandleFunc("POST /api/settlements/{id}/payments", feHandler.AddPaymentRecord)
 	mux.HandleFunc("POST /api/settlements/{id}/report-payment", feHandler.ReportPaymentFE)
 	mux.HandleFunc("PUT /api/settlements/{id}/payment-status", feHandler.UpdatePaymentStatusFE)
 	mux.HandleFunc("PUT /api/settlements/{id}", feHandler.UpdateSettlementFE)

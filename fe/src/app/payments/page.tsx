@@ -9,6 +9,7 @@ import {
   updatePaymentStatus,
   reportPayment,
   deleteSettlement,
+  addPaymentRecord,
   getNumberRosters,
   getAllUsers,
   getUser,
@@ -83,6 +84,7 @@ export default function PaymentsPage() {
   // Edit modal
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [editForm, setEditForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
+  const [editNewMembers, setEditNewMembers] = useState<{ id: string; name: string }[]>([]);
   const [editCashCollectorInput, setEditCashCollectorInput] = useState('');
   const [editCashCollectorError, setEditCashCollectorError] = useState('');
   const [editCashCollectorLoading, setEditCashCollectorLoading] = useState(false);
@@ -271,6 +273,7 @@ export default function PaymentsPage() {
       paymentMethods: s.paymentMethods ?? [], bankInfo: s.bankInfo ?? '', paypayInfo: s.paypayInfo ?? '',
       cashCollectors: s.cashCollectors ?? [], requiresConfirmation: s.requiresConfirmation ?? false,
     });
+    setEditNewMembers([]);
     setEditCashCollectorInput(''); setEditCashCollectorError('');
   };
 
@@ -290,17 +293,44 @@ export default function PaymentsPage() {
     if (!editingSettlement) return;
     if (!editForm.title || !editForm.amount || !editForm.dueDate) { alert('タイトル・金額・期限は必須です'); return; }
     setSaving(true);
-    await updateSettlement(editingSettlement.id, {
-      title: editForm.title, amount: Number(editForm.amount), dueDate: editForm.dueDate, note: editForm.note,
-      paymentMethods: editForm.paymentMethods, bankInfo: editForm.bankInfo, paypayInfo: editForm.paypayInfo,
-      cashCollectors: editForm.cashCollectors, requiresConfirmation: editForm.requiresConfirmation,
-    });
-    setAllSettlements(prev => prev.map(s =>
-      s.id === editingSettlement.id
-        ? { ...s, title: editForm.title, amount: Number(editForm.amount), dueDate: editForm.dueDate, note: editForm.note, paymentMethods: editForm.paymentMethods, bankInfo: editForm.bankInfo, paypayInfo: editForm.paypayInfo, cashCollectors: editForm.cashCollectors, requiresConfirmation: editForm.requiresConfirmation }
-        : s
-    ));
-    setSaving(false); setEditingSettlement(null);
+    try {
+      const newResolvedIds = editNewMembers.map(m => m.id).filter(
+        id => !(editingSettlement.resolvedMemberIds ?? []).includes(id)
+      );
+      await updateSettlement(editingSettlement.id, {
+        title: editForm.title, amount: Number(editForm.amount), dueDate: editForm.dueDate, note: editForm.note,
+        paymentMethods: editForm.paymentMethods, bankInfo: editForm.bankInfo, paypayInfo: editForm.paypayInfo,
+        cashCollectors: editForm.cashCollectors, requiresConfirmation: editForm.requiresConfirmation,
+      });
+      await Promise.all(
+        editNewMembers
+          .filter(m => newResolvedIds.includes(m.id))
+          .map(m => addPaymentRecord(editingSettlement.id, m.id, m.name))
+      );
+      setAllSettlements(prev => prev.map(s =>
+        s.id === editingSettlement.id
+          ? {
+              ...s,
+              title: editForm.title, amount: Number(editForm.amount), dueDate: editForm.dueDate, note: editForm.note,
+              paymentMethods: editForm.paymentMethods, bankInfo: editForm.bankInfo, paypayInfo: editForm.paypayInfo,
+              cashCollectors: editForm.cashCollectors, requiresConfirmation: editForm.requiresConfirmation,
+              resolvedMemberIds: [...(s.resolvedMemberIds ?? []), ...newResolvedIds],
+            }
+          : s
+      ));
+      setPaymentsCache(prev => {
+        if (!prev[editingSettlement.id]) return prev;
+        const newPayments = editNewMembers
+          .filter(m => newResolvedIds.includes(m.id))
+          .map(m => ({ memberId: m.id, name: m.name, status: 'unpaid' as const, confirmedAt: null }));
+        return { ...prev, [editingSettlement.id]: [...prev[editingSettlement.id], ...newPayments] };
+      });
+      setEditingSettlement(null);
+    } catch {
+      alert('保存に失敗しました。もう一度お試しください。');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleEditPaymentMethod = (m: PaymentMethod) =>
@@ -861,6 +891,10 @@ export default function PaymentsPage() {
                     </div>
                   </div>
                 </button>
+                <div className="flex items-center justify-between px-4 pb-3 gap-2">
+                  <button onClick={() => openEditModal(s)} className="text-xs text-white/30 hover:text-blue-400 transition-colors">編集</button>
+                  <button onClick={() => handleDeleteSettlement(s)} className="text-xs text-white/20 hover:text-red-400 transition-colors">削除</button>
+                </div>
 
                 {isExpanded && (
                   <div className="border-t border-white/[0.06]">
@@ -893,10 +927,6 @@ export default function PaymentsPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between px-4 py-2 border-t border-white/[0.04]">
-                      <button onClick={() => openEditModal(s)} className="text-xs text-white/30 hover:text-blue-400 transition-colors">編集</button>
-                      <button onClick={() => handleDeleteSettlement(s)} className="text-xs text-white/20 hover:text-red-400 transition-colors">この請求を削除</button>
-                    </div>
                   </div>
                 )}
               </div>
@@ -1001,6 +1031,22 @@ export default function PaymentsPage() {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* 対象者追加 */}
+            <div className="space-y-2">
+              <label className="text-[11px] text-white/30 block">対象者を追加</label>
+              <MemberSelectDropdown
+                allUsers={allUsers}
+                selected={editNewMembers}
+                onAdd={m => setEditNewMembers(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m])}
+                onRemove={id => setEditNewMembers(prev => prev.filter(m => m.id !== id))}
+                chipColor="green"
+                placeholder="メンバーを検索して追加..."
+              />
+              {editNewMembers.length > 0 && (
+                <p className="text-[11px] text-blue-400/70">{editNewMembers.length}人を新たに追加します</p>
               )}
             </div>
 
