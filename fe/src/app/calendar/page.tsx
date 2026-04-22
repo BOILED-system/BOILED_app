@@ -39,9 +39,7 @@ export default function CalendarPage() {
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
 
-      const sessions = role === 'admin'
-        ? allSessions
-        : allSessions.filter(s => isSessionForMember(s, memberId, genre, generation, rosters));
+      const sessions = allSessions.filter(s => isSessionForMember(s, memberId, genre, generation, rosters));
 
       const items = sessions.map((session: any) => {
         const rsvp = myRSVPsMap[session.id] ?? null;
