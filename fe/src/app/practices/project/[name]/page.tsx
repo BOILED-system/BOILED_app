@@ -56,16 +56,16 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const [numberRosters, setNumberRosters] = useState<NumberRoster[]>([]);
   const [allUsers, setAllUsers] = useState<FEUser[]>([]);
 
-  // 編集モーダルステート
+  // 編集モーダルステート（日程単位の編集：日時・場所のみ）
   const [editingSession, setEditingSession] = useState<PracticeSession | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [editSaving, setEditSaving] = useState(false);
-  const [editAddedMembers, setEditAddedMembers] = useState<{ id: string; name: string }[]>([]);
-  const [editAdditionalMembers, setEditAdditionalMembers] = useState<{ id: string; name: string }[]>([]);
-  const [editExcludedMembers, setEditExcludedMembers] = useState<{ id: string; name: string }[]>([]);
-  const [editMemberInput, setEditMemberInput] = useState('');
-  const [editMemberError, setEditMemberError] = useState('');
-  const [editMemberLoading, setEditMemberLoading] = useState(false);
+
+  // プロジェクト全体の対象者編集ステート
+  const [showProjectMembers, setShowProjectMembers] = useState(false);
+  const [projectAdditional, setProjectAdditional] = useState<{ id: string; name: string }[]>([]);
+  const [projectExcluded, setProjectExcluded] = useState<{ id: string; name: string }[]>([]);
+  const [projectSaving, setProjectSaving] = useState(false);
 
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'member';
@@ -151,10 +151,6 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   // ===== 編集・削除 =====
   const openEdit = (s: PracticeSession) => {
     setEditingSession(s);
-    const toMember = (id: string) => {
-      const u = allUsers.find(u => u.memberId === id);
-      return { id, name: u?.name || id };
-    };
     setEditForm({
       name: s.name, date: s.date, startTime: s.startTime, endTime: s.endTime || '',
       location: s.location || '', note: s.note || '', type: s.type || 'regular',
@@ -164,30 +160,22 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       additionalMemberIds: s.additionalMemberIds || [],
       excludedMemberIds: s.excludedMemberIds || [],
     });
-    if (s.targetType === 'individual' && s.targetMemberIds?.length) {
-      setEditAddedMembers(s.targetMemberIds.map(toMember));
-    } else {
-      setEditAddedMembers([]);
-    }
-    setEditAdditionalMembers((s.additionalMemberIds || []).map(toMember));
-    setEditExcludedMembers((s.excludedMemberIds || []).map(toMember));
-    setEditMemberInput(''); setEditMemberError('');
   };
 
   const handleEditSave = async () => {
     if (!editingSession) return;
     if (!editForm.name || !editForm.date || !editForm.startTime) { alert('必須項目が不足しています'); return; }
     setEditSaving(true);
+    // 日時・場所のみを更新（対象者はプロジェクト全体編集で管理）
     await updatePracticeSession(editingSession.id, {
       name: editForm.name, date: editForm.date, startTime: editForm.startTime,
       endTime: editForm.endTime, location: editForm.location, note: editForm.note,
-      type: editForm.type, targetType: editForm.targetType,
-      targetGenres: editForm.targetGenres, targetGenerations: editForm.targetGenerations,
-      targetNumberId: editForm.targetNumberId, targetMemberIds: editForm.targetMemberIds,
-      additionalMemberIds: editForm.additionalMemberIds,
-      excludedMemberIds: editForm.excludedMemberIds,
     });
-    setGroupSessions(prev => prev.map(s => s.id === editingSession.id ? { ...s, ...editForm } : s));
+    setGroupSessions(prev => prev.map(s => s.id === editingSession.id ? {
+      ...s,
+      name: editForm.name, date: editForm.date, startTime: editForm.startTime,
+      endTime: editForm.endTime, location: editForm.location, note: editForm.note,
+    } : s));
     setEditSaving(false);
     setEditingSession(null);
   };
@@ -199,8 +187,9 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       const next = groupSessions.filter(x => x.id !== s.id);
       setGroupSessions(next);
       if (next.length === 0) router.back();
-    } catch {
-      alert('削除に失敗しました。もう一度お試しください。');
+    } catch (e: any) {
+      console.error('[handleDelete]', e);
+      alert(`削除に失敗しました: ${e?.message || e}`);
     }
   };
 
@@ -209,35 +198,83 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
     try {
       await Promise.all(groupSessions.map(s => deletePracticeSession(s.id)));
       router.back();
-    } catch {
-      alert('削除に失敗しました。もう一度お試しください。');
+    } catch (e: any) {
+      console.error('[handleDeleteProject]', e);
+      alert(`削除に失敗しました: ${e?.message || e}`);
     }
   };
 
-  const handleEditAddMember = async () => { /* 略 */
-    const mid = editMemberInput.trim();
-    if (!mid) return;
-    if (editAddedMembers.find(m => m.id === mid)) { setEditMemberError('すでに追加されています'); return; }
-    setEditMemberLoading(true); setEditMemberError('');
-    const user = await getUser(mid);
-    setEditMemberLoading(false);
-    if (!user) { setEditMemberError('会員番号が見つかりません'); return; }
-    setEditAddedMembers(prev => [...prev, { id: mid, name: user.name as string }]);
-    setEditForm(f => ({ ...f, targetMemberIds: [...f.targetMemberIds, mid] }));
-    setEditMemberInput('');
-  };
-  const handleEditRemoveMember = (mid: string) => {
-    setEditAddedMembers(prev => prev.filter(m => m.id !== mid));
-    setEditForm(f => ({ ...f, targetMemberIds: f.targetMemberIds.filter(x => x !== mid) }));
+  const openProjectMembers = () => {
+    const toMember = (id: string) => {
+      const u = allUsers.find(u => u.memberId === id);
+      return { id, name: u?.name || id };
+    };
+    const additionalIds = Array.from(new Set(groupSessions.flatMap(s => s.additionalMemberIds || [])));
+    const excludedIds = Array.from(new Set(groupSessions.flatMap(s => s.excludedMemberIds || [])));
+    setProjectAdditional(additionalIds.map(toMember));
+    setProjectExcluded(excludedIds.map(toMember));
+    setShowProjectMembers(true);
   };
 
-  const toggleEditGenre = (g: string) => setEditForm(f => ({ ...f, targetGenres: f.targetGenres.includes(g) ? f.targetGenres.filter(x => x !== g) : [...f.targetGenres, g] }));
-  const toggleEditGen = (g: number) => setEditForm(f => ({ ...f, targetGenerations: f.targetGenerations.includes(g) ? f.targetGenerations.filter(x => x !== g) : [...f.targetGenerations, g] }));
-
+  const handleSaveProjectMembers = async () => {
+    setProjectSaving(true);
+    try {
+      const additionalIds = projectAdditional.map(m => m.id);
+      const excludedIds = projectExcluded.map(m => m.id);
+      await Promise.all(groupSessions.map(s =>
+        updatePracticeSession(s.id, {
+          additionalMemberIds: additionalIds,
+          excludedMemberIds: excludedIds,
+        })
+      ));
+      setGroupSessions(prev => prev.map(s => ({
+        ...s,
+        additionalMemberIds: additionalIds,
+        excludedMemberIds: excludedIds,
+      })));
+      setShowProjectMembers(false);
+    } catch (e: any) {
+      console.error('[handleSaveProjectMembers]', e);
+      alert(`保存に失敗しました: ${e?.message || e}`);
+    } finally {
+      setProjectSaving(false);
+    }
+  };
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin"/></div>;
   }
+
+  // プロジェクト全体の primary target を計算（全セッションの union）
+  const projectPrimaryTargetIds = (() => {
+    const ids = new Set<string>();
+    for (const s of groupSessions) {
+      const tt = s.targetType || 'genre_generation';
+      if (tt === 'genre_generation') {
+        allUsers.forEach(u => {
+          const genreOk = !s.targetGenres?.length || s.targetGenres.includes(u.genre as string);
+          const genOk = !s.targetGenerations?.length || s.targetGenerations.includes(u.generation as number);
+          if (genreOk && genOk && (s.targetGenres?.length || s.targetGenerations?.length)) {
+            ids.add(u.memberId);
+          }
+        });
+      } else if (tt === 'number') {
+        const roster = numberRosters.find(r => r.id === s.targetNumberId);
+        roster?.memberIds.forEach(id => ids.add(id));
+      } else if (tt === 'individual') {
+        s.targetMemberIds?.forEach(id => ids.add(id));
+      }
+    }
+    return ids;
+  })();
+  // 追加: primary target に未所属のメンバーのみ
+  const projectUsersForAdditional = allUsers.filter(u => !projectPrimaryTargetIds.has(u.memberId));
+  // 除外: 現状メンバー（primary target ∪ 追加リスト）のみ
+  const projectCurrentMemberIds = new Set<string>([
+    ...Array.from(projectPrimaryTargetIds),
+    ...projectAdditional.map(m => m.id),
+  ]);
+  const projectUsersForExcluded = allUsers.filter(u => projectCurrentMemberIds.has(u.memberId));
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 overflow-x-hidden pb-10">
@@ -245,11 +282,16 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
         <button onClick={() => router.back()} className="text-white/40 hover:text-white transition-colors">← 戻る</button>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-white truncate">{groupName}</h1>
-        <button onClick={handleDeleteProject} className="text-xs text-red-400/60 hover:text-red-400 transition-colors px-2 py-1">
-          プロジェクトを削除
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={openProjectMembers} className="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
+            対象者を編集
+          </button>
+          <button onClick={handleDeleteProject} className="text-xs text-red-400/60 hover:text-red-400 transition-colors px-2 py-1 whitespace-nowrap">
+            プロジェクトを削除
+          </button>
+        </div>
       </div>
 
       <div className="bg-[#141824] border border-white/[0.08] rounded-xl overflow-hidden p-4 space-y-6">
@@ -359,43 +401,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
               onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
               className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
 
-            <div className="space-y-2 border-t border-white/[0.08] pt-4">
-              <label className="text-[11px] text-white/30 block">追加メンバー（任意）</label>
-              <p className="text-[10px] text-white/20">対象外でも個別に追加できます</p>
-              <MemberSelectDropdown
-                allUsers={allUsers.filter(u => !editAdditionalMembers.find(m => m.id === u.memberId))}
-                selected={editAdditionalMembers}
-                onAdd={m => {
-                  setEditAdditionalMembers(prev => [...prev, m]);
-                  setEditForm(f => ({ ...f, additionalMemberIds: [...f.additionalMemberIds, m.id] }));
-                }}
-                onRemove={id => {
-                  setEditAdditionalMembers(prev => prev.filter(m => m.id !== id));
-                  setEditForm(f => ({ ...f, additionalMemberIds: f.additionalMemberIds.filter(x => x !== id) }));
-                }}
-                chipColor="green"
-                placeholder="追加するメンバーを選択..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] text-white/30 block">除外メンバー（任意）</label>
-              <p className="text-[10px] text-white/20">対象でも個別に外せます</p>
-              <MemberSelectDropdown
-                allUsers={allUsers.filter(u => !editExcludedMembers.find(m => m.id === u.memberId))}
-                selected={editExcludedMembers}
-                onAdd={m => {
-                  setEditExcludedMembers(prev => [...prev, m]);
-                  setEditForm(f => ({ ...f, excludedMemberIds: [...f.excludedMemberIds, m.id] }));
-                }}
-                onRemove={id => {
-                  setEditExcludedMembers(prev => prev.filter(m => m.id !== id));
-                  setEditForm(f => ({ ...f, excludedMemberIds: f.excludedMemberIds.filter(x => x !== id) }));
-                }}
-                chipColor="red"
-                placeholder="除外するメンバーを選択..."
-              />
-            </div>
+            <p className="text-[11px] text-white/30">対象者の追加・除外はプロジェクト上部の「対象者を編集」から行えます。</p>
 
             <div className="flex gap-2 pt-4 border-t border-white/[0.08]">
               <button onClick={() => setEditingSession(null)}
@@ -405,6 +411,58 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
               <button onClick={handleEditSave} disabled={editSaving}
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-xl">
                 {editSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* プロジェクト全体の対象者編集モーダル */}
+      {showProjectMembers && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowProjectMembers(false)} />
+          <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white">プロジェクト全体の対象者</h2>
+              <button type="button" onClick={() => setShowProjectMembers(false)} aria-label="閉じる"
+                className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-lg">×</button>
+            </div>
+            <p className="text-[11px] text-white/40">ここでの変更はこのプロジェクトの<strong className="text-white/70">全日程</strong>に反映されます。</p>
+
+            <div className="space-y-2">
+              <label className="text-[11px] text-white/30 block">追加メンバー（任意）</label>
+              <p className="text-[10px] text-white/20">対象外のメンバーのみ表示</p>
+              <MemberSelectDropdown
+                allUsers={projectUsersForAdditional}
+                selected={projectAdditional}
+                onAdd={m => setProjectAdditional(prev => [...prev, m])}
+                onRemove={id => setProjectAdditional(prev => prev.filter(m => m.id !== id))}
+                chipColor="green"
+                placeholder="追加するメンバーを選択..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] text-white/30 block">除外メンバー（任意）</label>
+              <p className="text-[10px] text-white/20">対象メンバーのみ表示</p>
+              <MemberSelectDropdown
+                allUsers={projectUsersForExcluded}
+                selected={projectExcluded}
+                onAdd={m => setProjectExcluded(prev => [...prev, m])}
+                onRemove={id => setProjectExcluded(prev => prev.filter(m => m.id !== id))}
+                chipColor="red"
+                placeholder="除外するメンバーを選択..."
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t border-white/[0.08]">
+              <button onClick={() => setShowProjectMembers(false)}
+                className="flex-1 py-2.5 text-sm text-white/40 hover:text-white/60 bg-white/[0.04] rounded-xl">
+                キャンセル
+              </button>
+              <button onClick={handleSaveProjectMembers} disabled={projectSaving}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-xl">
+                {projectSaving ? '保存中...' : '全日程に反映して保存'}
               </button>
             </div>
           </div>
