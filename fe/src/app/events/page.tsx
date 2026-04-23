@@ -101,6 +101,11 @@ export default function EventsPage() {
       {/* 作成フォーム */}
       {showForm && (
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-3">
+          <button type="button"
+            onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setTimetable([]); setTimetableInput({ time: '', description: '' }); }}
+            className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1">
+            ← イベント一覧に戻る
+          </button>
           <p className="text-xs font-medium text-white/40 uppercase tracking-wider">イベントを作成</p>
 
           <input

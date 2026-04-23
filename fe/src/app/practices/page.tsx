@@ -181,6 +181,10 @@ export default function PracticesPage() {
 
       {showForm && (
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-5 space-y-5 shadow-2xl">
+          <button type="button" onClick={resetForm}
+            className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1">
+            ← 練習一覧に戻る
+          </button>
           <p className="text-xs font-bold text-white/40 uppercase tracking-wider">新規練習プロジェクトの作成</p>
 
           <div className="flex gap-2">

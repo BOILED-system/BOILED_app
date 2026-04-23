@@ -506,6 +506,11 @@ export default function PaymentsPage() {
       {/* ===== 作成フォーム ===== */}
       {showForm && (
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-4">
+          <button type="button"
+            onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setTargetMembers([]); setExtraMembers([]); setExcludedMembers([]); setCashCollectorInput(''); }}
+            className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1">
+            ← 清算一覧に戻る
+          </button>
           <p className="text-xs font-medium text-white/40 uppercase tracking-wider">請求を作成</p>
 
           <input type="text" placeholder="タイトル（例：新歓打ち上げ代）" value={form.title}
