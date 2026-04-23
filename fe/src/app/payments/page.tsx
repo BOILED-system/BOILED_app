@@ -408,8 +408,9 @@ export default function PaymentsPage() {
     try {
       await deleteSettlement(s.id);
       setAllSettlements(prev => prev.filter(x => x.id !== s.id));
-    } catch {
-      alert('削除に失敗しました。もう一度お試しください。');
+    } catch (e: any) {
+      console.error('[handleDeleteSettlement]', e);
+      alert(`削除に失敗しました: ${e?.message || e}`);
     }
   };
 
