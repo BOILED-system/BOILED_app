@@ -508,7 +508,11 @@ export default function PaymentsPage() {
       {showForm && (
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-white/40 uppercase tracking-wider">請求を作成</p>
+            <button type="button"
+              onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setTargetMembers([]); setExtraMembers([]); setExcludedMembers([]); setCashCollectorInput(''); }}
+              className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1">
+              ← 清算一覧に戻る
+            </button>
             <button type="button"
               onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setTargetMembers([]); setExtraMembers([]); setExcludedMembers([]); setCashCollectorInput(''); }}
               aria-label="閉じる"
@@ -516,6 +520,7 @@ export default function PaymentsPage() {
               ×
             </button>
           </div>
+          <p className="text-xs font-medium text-white/40 uppercase tracking-wider">請求を作成</p>
 
           <input type="text" placeholder="タイトル（例：新歓打ち上げ代）" value={form.title}
             onChange={e => setForm({ ...form, title: e.target.value })}

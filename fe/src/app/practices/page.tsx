@@ -182,13 +182,17 @@ export default function PracticesPage() {
       {showForm && (
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-5 space-y-5 shadow-2xl">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-white/40 uppercase tracking-wider">新規練習プロジェクトの作成</p>
+            <button type="button" onClick={resetForm}
+              className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1">
+              ← 練習一覧に戻る
+            </button>
             <button type="button" onClick={resetForm}
               aria-label="閉じる"
               className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] transition-colors text-lg">
               ×
             </button>
           </div>
+          <p className="text-xs font-bold text-white/40 uppercase tracking-wider">新規練習プロジェクトの作成</p>
 
           <div className="flex gap-2">
             {(['regular', 'event', 'team'] as const).map(t => (
