@@ -49,7 +49,7 @@ export default function CalendarPage() {
           title: session.name,
           start: session.date,
           type: session.type === 'event' ? 'event' : 'practice',
-          url: `/practices/${session.id}`,
+          url: `/practices/project/${encodeURIComponent(session.name)}`,
           color,
         };
       });
