@@ -506,7 +506,15 @@ export default function PaymentsPage() {
       {/* ===== 作成フォーム ===== */}
       {showForm && (
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 space-y-4">
-          <p className="text-xs font-medium text-white/40 uppercase tracking-wider">請求を作成</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-white/40 uppercase tracking-wider">請求を作成</p>
+            <button type="button"
+              onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setTargetMembers([]); setExtraMembers([]); setExcludedMembers([]); setCashCollectorInput(''); }}
+              aria-label="閉じる"
+              className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] transition-colors text-lg">
+              ×
+            </button>
+          </div>
 
           <input type="text" placeholder="タイトル（例：新歓打ち上げ代）" value={form.title}
             onChange={e => setForm({ ...form, title: e.target.value })}
