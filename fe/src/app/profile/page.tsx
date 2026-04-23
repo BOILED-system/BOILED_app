@@ -88,7 +88,7 @@ export default function ProfilePage() {
             {unregistered.map(session => (
               <Link
                 key={session.id}
-                href={`/practices/${session.id}`}
+                href={`/practices/project/${encodeURIComponent(session.name)}`}
                 className="flex items-center justify-between bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 hover:bg-yellow-500/15 transition-colors group"
               >
                 <div className="min-w-0 flex-1">
