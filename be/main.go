@@ -112,6 +112,7 @@ func main() {
 
 	// Initialize FE-compatible handler (adapter layer)
 	feHandler := handler.NewFEHandler(feInteractor)
+	calendarHandler := handler.NewCalendarHandler(feInteractor)
 
 	// Setup router — existing routes
 	mux := router.Setup(
@@ -127,6 +128,7 @@ func main() {
 
 	// Setup FE-compatible routes under /api prefix
 	router.SetupFE(mux, feHandler)
+	router.SetupFECalendar(mux, calendarHandler)
 
 	// Setup CORS
 	c := cors.New(cors.Options{

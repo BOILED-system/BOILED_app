@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getPracticeSessions, getMyRSVPs, getNumberRosters, getUser, isSessionForMember } from '@/lib/api';
-import CalendarView from '@/components/CalendarView';
-
-const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
+import {
+  getPracticeSessions,
+  getMyRSVPs,
+  getNumberRosters,
+  getUser,
+  getEvents,
+  isSessionForMember,
+} from '@/lib/api';
+import CalendarView, { type CalendarItem } from '@/components/CalendarView';
 
 const STATUS_COLORS: Record<string, string> = {
   GO: '#10b981',
@@ -13,47 +18,88 @@ const STATUS_COLORS: Record<string, string> = {
   EARLY: '#f97316',
 };
 
+const PRACTICE_COLOR = '#3b82f6'; // blue
+const EVENT_COLOR = '#ec4899';    // pink
+
+const buildDateTime = (date: string, time: string): string => {
+  if (!date) return '';
+  if (!time) return date;
+  return `${date}T${time}:00`;
+};
+
+const addHours = (time: string, hours: number): string => {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const total = h * 60 + m + hours * 60;
+  const hh = Math.floor((total / 60) % 24);
+  const mm = total % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
 export default function CalendarPage() {
-  const [calendarItems, setCalendarItems] = useState<any[]>([]);
+  const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showICalModal, setShowICalModal] = useState(false);
-  const [selectedGenre, setSelectedGenre] = useState('');
+  const [memberId, setMemberId] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
-    const memberId = localStorage.getItem('memberId') || '';
+    const mid = localStorage.getItem('memberId') || '';
+    setMemberId(mid);
     setBaseUrl(window.location.origin);
-    load(memberId);
+    load(mid);
   }, []);
 
-  const load = async (memberId: string) => {
+  const load = async (mid: string) => {
     try {
-      const [allSessions, rosters, user, myRSVPsMap] = await Promise.all([
+      const [allSessions, rosters, user, myRSVPsMap, events] = await Promise.all([
         getPracticeSessions(),
         getNumberRosters(),
-        memberId ? getUser(memberId) : Promise.resolve(null),
-        memberId ? getMyRSVPs(memberId) : Promise.resolve({} as Record<string, any>),
+        mid ? getUser(mid) : Promise.resolve(null),
+        mid ? getMyRSVPs(mid) : Promise.resolve({} as Record<string, any>),
+        getEvents(),
       ]);
 
-      const role = localStorage.getItem('userRole') || 'member';
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
 
-      const sessions = allSessions.filter(s => isSessionForMember(s, memberId, genre, generation, rosters));
+      const targetedSessions = allSessions.filter(s =>
+        isSessionForMember(s, mid, genre, generation, rosters)
+      );
 
-      const items = sessions.map((session: any) => {
+      const practiceItems: CalendarItem[] = targetedSessions.map(session => {
         const rsvp = myRSVPsMap[session.id] ?? null;
-        const color = rsvp ? STATUS_COLORS[rsvp.status] : undefined;
+        const color = rsvp ? STATUS_COLORS[rsvp.status] : PRACTICE_COLOR;
+        const endTime = session.endTime || addHours(session.startTime, 2);
+        const title = session.location ? `${session.name} / ${session.location}` : session.name;
         return {
           id: session.id,
-          title: session.name,
-          start: session.date,
-          type: session.type === 'event' ? 'event' : 'practice',
+          title,
+          start: buildDateTime(session.date, session.startTime),
+          end: endTime ? buildDateTime(session.date, endTime) : undefined,
+          type: 'practice',
           url: `/practices/project/${encodeURIComponent(session.name)}`,
           color,
         };
       });
-      setCalendarItems(items);
+
+      const eventItems: CalendarItem[] = events.map(ev => {
+        const startT = ev.meetingTime || '10:00';
+        const endT = addHours(startT, 2);
+        const loc = ev.location || ev.meetingLocation || '';
+        const title = loc ? `${ev.title} / ${loc}` : ev.title;
+        return {
+          id: `ev-${ev.id}`,
+          title,
+          start: buildDateTime(ev.date, startT),
+          end: buildDateTime(ev.date, endT),
+          type: 'event',
+          url: `/events/${ev.id}`,
+          color: EVENT_COLOR,
+        };
+      });
+
+      setCalendarItems([...practiceItems, ...eventItems]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -61,16 +107,11 @@ export default function CalendarPage() {
     }
   };
 
-  const getICalUrl = (genre: string) => {
-    const params = new URLSearchParams();
-    if (genre) params.set('genre', genre);
-    return `${baseUrl}/api/calendar?${params.toString()}`;
-  };
-
-  const getGoogleCalendarUrl = (genre: string) => {
-    const icalUrl = getICalUrl(genre).replace(/^https?:\/\//, 'webcal://');
-    return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
-  };
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || baseUrl).replace(/\/$/, '');
+  const practicesICalUrl = memberId ? `${apiBase}/api/calendar/practices.ics?memberId=${memberId}` : '';
+  const eventsICalUrl = `${apiBase}/api/calendar/events.ics`;
+  const practicesGCalUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(practicesICalUrl.replace(/^https?:\/\//, 'webcal://'))}`;
+  const eventsGCalUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(eventsICalUrl.replace(/^https?:\/\//, 'webcal://'))}`;
 
   if (loading) {
     return (
@@ -97,7 +138,8 @@ export default function CalendarPage() {
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />欠席</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" />遅刻</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />早退</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-600 inline-block" />未登録</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />未登録の練習</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block" />イベント</span>
       </div>
 
       <div className="animate-fade-in">
@@ -106,51 +148,41 @@ export default function CalendarPage() {
 
       {showICalModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h2 className="text-white font-bold text-lg">Googleカレンダーに追加</h2>
-            <p className="text-white/40 text-xs">自分のジャンルを選ぶと、そのジャンルの練習だけが追加されます。</p>
-
-            <div className="space-y-2">
-              <label className="text-xs text-white/30">ジャンルを選択</label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setSelectedGenre('')}
-                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${!selectedGenre ? 'bg-white text-black' : 'bg-white/[0.06] text-white/50'}`}
-                >
-                  全て
-                </button>
-                {GENRES.map(g => (
-                  <button
-                    key={g}
-                    onClick={() => setSelectedGenre(g)}
-                    className={`text-xs px-3 py-1.5 rounded-full transition-colors ${selectedGenre === g ? 'bg-blue-500 text-white' : 'bg-white/[0.06] text-white/50'}`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
+          <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-bold text-lg">Googleカレンダーに追加</h2>
+              <button onClick={() => setShowICalModal(false)} aria-label="閉じる"
+                className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-lg">
+                ×
+              </button>
             </div>
+            <p className="text-white/40 text-xs">
+              自分が対象者になっている練習プロジェクトと、すべてのイベントを Google カレンダーに追加できます。練習はブルー、イベントはピンクで表示されます（追加後 Google カレンダーで色を変更できます）。
+            </p>
 
             <div className="space-y-2">
-              <a
-                href={getGoogleCalendarUrl(selectedGenre)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
-              >
-                Googleカレンダーに追加
+              <p className="text-xs font-medium text-blue-400">📘 練習プロジェクト（自分が対象）</p>
+              <a href={practicesGCalUrl} target="_blank" rel="noopener noreferrer"
+                className="block w-full text-center py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors">
+                練習をGoogleカレンダーに追加
               </a>
-              <button
-                onClick={() => navigator.clipboard.writeText(getICalUrl(selectedGenre))}
-                className="block w-full text-center py-2.5 bg-white/[0.06] hover:bg-white/[0.1] text-white/60 text-sm rounded-lg transition-colors"
-              >
-                iCal URLをコピー（他のカレンダーアプリ用）
+              <button onClick={() => navigator.clipboard.writeText(practicesICalUrl)}
+                className="block w-full text-center py-2 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded-lg transition-colors">
+                iCal URLをコピー
               </button>
             </div>
 
-            <button onClick={() => setShowICalModal(false)} className="text-xs text-white/30 hover:text-white/50 w-full text-center">
-              閉じる
-            </button>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-pink-400">🎉 イベント</p>
+              <a href={eventsGCalUrl} target="_blank" rel="noopener noreferrer"
+                className="block w-full text-center py-2.5 bg-pink-500 hover:bg-pink-600 text-white text-sm rounded-lg transition-colors">
+                イベントをGoogleカレンダーに追加
+              </a>
+              <button onClick={() => navigator.clipboard.writeText(eventsICalUrl)}
+                className="block w-full text-center py-2 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded-lg transition-colors">
+                iCal URLをコピー
+              </button>
+            </div>
           </div>
         </div>
       )}
