@@ -7,6 +7,12 @@ import (
 	"github.com/noa/circle-app/api/adapter/http/handler"
 )
 
+// SetupFECalendar registers iCal endpoints.
+func SetupFECalendar(mux *http.ServeMux, calHandler *handler.CalendarHandler) {
+	mux.HandleFunc("GET /api/calendar/practices.ics", calHandler.PracticesICal)
+	mux.HandleFunc("GET /api/calendar/events.ics", calHandler.EventsICal)
+}
+
 // SetupFE configures all FE-compatible routes under /api prefix.
 func SetupFE(mux *http.ServeMux, feHandler *handler.FEHandler) {
 	// Auth

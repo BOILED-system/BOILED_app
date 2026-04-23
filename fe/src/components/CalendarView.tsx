@@ -12,6 +12,7 @@ export interface CalendarItem {
   id: string;
   title: string;
   start: string;
+  end?: string;
   type: 'event' | 'practice';
   url: string;
   color?: string;
@@ -36,8 +37,9 @@ export default function CalendarView({ items }: CalendarViewProps) {
     id: item.id,
     title: item.title,
     start: item.start,
-    backgroundColor: item.color || (item.type === 'event' ? '#8b5cf6' : '#334155'),
-    borderColor: item.color || (item.type === 'event' ? '#7c3aed' : '#475569'),
+    end: item.end,
+    backgroundColor: item.color || (item.type === 'event' ? '#ec4899' : '#3b82f6'),
+    borderColor: item.color || (item.type === 'event' ? '#db2777' : '#2563eb'),
     textColor: '#ffffff',
     extendedProps: { url: item.url },
   }));
@@ -67,6 +69,7 @@ export default function CalendarView({ items }: CalendarViewProps) {
         moreLinkClick="popover"
         buttonText={{ today: '今日', month: '月', week: '週', day: '日', list: 'リスト' }}
         noEventsContent="予定はありません"
+        dayCellContent={(arg) => arg.dayNumberText.replace('日', '')}
       />
     </div>
   );
