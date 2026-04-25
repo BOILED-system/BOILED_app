@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { readFileSync } from 'fs';
 import { createInterface } from 'readline';
 
@@ -104,7 +104,7 @@ const existingDocs = await getDocs(collection(db, 'practiceSessions'));
 const existingKeys = new Set(existingDocs.docs.map(d => `${d.data().date}_${d.data().name}`));
 console.log(`既存: ${existingDocs.size} 件\n`);
 
-const csv = readFileSync('./practices.csv', 'utf-8');
+const csv = readFileSync('./practices.csv', 'utf-8').replace(/^﻿/, ''); // BOM除去
 const lines = csv.trim().split('\n').slice(1); // 1行目（ヘッダー）をスキップ
 
 const toInsert = [];
@@ -185,7 +185,8 @@ if (answer !== 'y') {
 console.log('\n登録中...');
 let count = 0;
 for (const session of toInsert) {
-  await addDoc(collection(db, 'practiceSessions'), session);
+  const ref = doc(collection(db, 'practiceSessions'));
+  await setDoc(ref, { ...session, id: ref.id });
   console.log(`  登録: ${session.date} ${session.name}`);
   count++;
 }
