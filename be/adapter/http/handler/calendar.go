@@ -86,13 +86,7 @@ func (h *CalendarHandler) EventsICal(w http.ResponseWriter, r *http.Request) {
 	writeICalHeader(&b, "BOILED イベント")
 
 	for _, e := range events {
-		// Use meetingTime if available, else default to all-day for events
-		startStr := e.MeetingTime
-		if startStr == "" {
-			startStr = "10:00"
-		}
-		startUTC, endUTC, ok := parseSessionRange(e.Date, startStr, "", jst)
-		if !ok {
+		if e.Date == "" {
 			continue
 		}
 		summary := e.Title
@@ -103,8 +97,9 @@ func (h *CalendarHandler) EventsICal(w http.ResponseWriter, r *http.Request) {
 		if loc != "" {
 			summary = e.Title + " / " + loc
 		}
-		writeVEvent(&b, "event-"+e.ID, now, startUTC, endUTC, summary, loc)
+		writeAllDayVEvent(&b, "event-"+e.ID, now, e.Date, summary, loc)
 	}
+	_ = jst
 
 	b.WriteString("END:VCALENDAR\r\n")
 	writeICalResponse(w, "boiled-events.ics", b.String())
@@ -120,6 +115,27 @@ func writeICalHeader(b *strings.Builder, calName string) {
 	b.WriteString("METHOD:PUBLISH\r\n")
 	b.WriteString("X-WR-CALNAME:" + calName + "\r\n")
 	b.WriteString("X-WR-TIMEZONE:Asia/Tokyo\r\n")
+}
+
+func writeAllDayVEvent(b *strings.Builder, uid, dtstamp, date, summary, location string) {
+	// Parse date as YYYY-MM-DD and format as YYYYMMDD for iCal VALUE=DATE
+	d := strings.ReplaceAll(date, "-", "")
+	// DTEND for all-day is the next day (exclusive)
+	t, err := time.Parse("20060102", d)
+	nextDay := d
+	if err == nil {
+		nextDay = t.AddDate(0, 0, 1).Format("20060102")
+	}
+	b.WriteString("BEGIN:VEVENT\r\n")
+	b.WriteString("UID:" + uid + "@boiled\r\n")
+	b.WriteString("DTSTAMP:" + dtstamp + "\r\n")
+	b.WriteString("DTSTART;VALUE=DATE:" + d + "\r\n")
+	b.WriteString("DTEND;VALUE=DATE:" + nextDay + "\r\n")
+	b.WriteString("SUMMARY:" + escapeICalText(summary) + "\r\n")
+	if location != "" {
+		b.WriteString("LOCATION:" + escapeICalText(location) + "\r\n")
+	}
+	b.WriteString("END:VEVENT\r\n")
 }
 
 func writeVEvent(b *strings.Builder, uid, dtstamp, dtstart, dtend, summary, location string) {

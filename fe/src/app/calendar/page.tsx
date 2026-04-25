@@ -84,15 +84,12 @@ export default function CalendarPage() {
       });
 
       const eventItems: CalendarItem[] = events.map(ev => {
-        const startT = ev.meetingTime || '10:00';
-        const endT = addHours(startT, 2);
         const loc = ev.location || ev.meetingLocation || '';
         const title = loc ? `${ev.title} / ${loc}` : ev.title;
         return {
           id: `ev-${ev.id}`,
           title,
-          start: buildDateTime(ev.date, startT),
-          end: buildDateTime(ev.date, endT),
+          start: ev.date,
           type: 'event',
           url: `/events/${ev.id}`,
           color: EVENT_COLOR,
@@ -158,6 +155,9 @@ export default function CalendarPage() {
             </div>
             <p className="text-white/40 text-xs">
               自分が対象者になっている練習プロジェクトと、すべてのイベントを Google カレンダーに追加できます。練習はブルー、イベントはピンクで表示されます（追加後 Google カレンダーで色を変更できます）。
+            </p>
+            <p className="text-white/30 text-xs">
+              一度追加すると自動で購読され、新しい練習・イベントは最大24時間以内に自動反映されます。
             </p>
 
             <div className="space-y-2">
