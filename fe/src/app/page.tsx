@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getUser } from "@/lib/api";
 import BoiledLogo from "@/components/BoiledLogo";
@@ -9,6 +9,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    if (localStorage.getItem("memberId")) {
+      router.replace("/profile");
+    }
+  }, []);
 
   const handleLogin = async () => {
     if (!memberId.trim()) return;
