@@ -8,6 +8,7 @@ import {
   getMyRSVPs,
   updatePracticeSession,
   deletePracticeSession,
+  createPracticeSession,
   getNumberRosters,
   getAllUsers,
   getUser,
@@ -60,6 +61,11 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const [editingSession, setEditingSession] = useState<PracticeSession | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [editSaving, setEditSaving] = useState(false);
+
+  // 日程追加モーダルステート
+  const [showAddSchedule, setShowAddSchedule] = useState(false);
+  const [addScheduleForm, setAddScheduleForm] = useState({ date: '', startTime: '19:00', endTime: '21:00', location: '' });
+  const [addScheduleSaving, setAddScheduleSaving] = useState(false);
 
   // プロジェクト全体の対象者編集ステート
   const [showProjectMembers, setShowProjectMembers] = useState(false);
@@ -193,6 +199,46 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
     }
   };
 
+  const handleAddSchedule = async () => {
+    if (!addScheduleForm.date || !addScheduleForm.startTime) { alert('日付と開始時間は必須です'); return; }
+    setAddScheduleSaving(true);
+    try {
+      const base = groupSessions[0];
+      const createdBy = memberId;
+      const createdByName = localStorage.getItem('userName') || '';
+      const payload = {
+        name: groupName,
+        date: addScheduleForm.date,
+        startTime: addScheduleForm.startTime,
+        endTime: addScheduleForm.endTime,
+        location: addScheduleForm.location,
+        note: base?.note || '',
+        type: base?.type || 'regular' as const,
+        targetType: base?.targetType || 'genre_generation' as const,
+        targetGenres: base?.targetGenres || [],
+        targetGenerations: base?.targetGenerations || [],
+        targetNumberId: base?.targetNumberId || '',
+        targetMemberIds: base?.targetMemberIds || [],
+        additionalMemberIds: base?.additionalMemberIds || [],
+        excludedMemberIds: base?.excludedMemberIds || [],
+        createdBy,
+        createdByName,
+      };
+      const newId = await createPracticeSession(payload);
+      const newSession: PracticeSession = { id: newId, createdAt: new Date().toISOString(), ...payload };
+      setGroupSessions(prev =>
+        [...prev, newSession].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      );
+      setAddScheduleForm({ date: '', startTime: '19:00', endTime: '21:00', location: '' });
+      setShowAddSchedule(false);
+    } catch (e: any) {
+      console.error('[handleAddSchedule]', e);
+      alert(`追加に失敗しました: ${e?.message || e}`);
+    } finally {
+      setAddScheduleSaving(false);
+    }
+  };
+
   const handleDeleteProject = async () => {
     if (!confirm(`プロジェクト「${groupName}」の日程をすべて削除しますか？この操作は取り消せません。`)) return;
     try {
@@ -285,6 +331,9 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-white truncate">{groupName}</h1>
         <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={() => setShowAddSchedule(true)} className="text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
+            + 日程を追加
+          </button>
           <button onClick={openProjectMembers} className="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
             対象者を編集
           </button>
@@ -366,6 +415,57 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
           </button>
         </div>
       </div>
+
+      {/* 日程追加モーダル */}
+      {showAddSchedule && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddSchedule(false)} />
+          <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white">日程を追加</h2>
+              <button type="button" onClick={() => setShowAddSchedule(false)} aria-label="閉じる"
+                className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-lg">×</button>
+            </div>
+            <p className="text-[11px] text-white/40">対象者・ターゲット設定はプロジェクトの既存日程から引き継ぎます。</p>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-[11px] text-white/30 block mb-1">日付 <span className="text-red-400">*</span></label>
+                <input type="date" value={addScheduleForm.date}
+                  onChange={e => setAddScheduleForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] text-white/30 block mb-1">開始 <span className="text-red-400">*</span></label>
+                <input type="time" value={addScheduleForm.startTime}
+                  onChange={e => { const t = e.target.value; setAddScheduleForm(f => ({ ...f, startTime: t, endTime: addTwoHours(t) })); }}
+                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-[11px] text-white/30 block mb-1">終了</label>
+                <input type="time" value={addScheduleForm.endTime}
+                  onChange={e => setAddScheduleForm(f => ({ ...f, endTime: e.target.value }))}
+                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+              </div>
+            </div>
+
+            <input type="text" placeholder="場所（任意）" value={addScheduleForm.location}
+              onChange={e => setAddScheduleForm(f => ({ ...f, location: e.target.value }))}
+              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
+
+            <div className="flex gap-2 pt-4 border-t border-white/[0.08]">
+              <button onClick={() => setShowAddSchedule(false)}
+                className="flex-1 py-2.5 text-sm text-white/40 hover:text-white/60 bg-white/[0.04] rounded-xl">
+                キャンセル
+              </button>
+              <button onClick={handleAddSchedule} disabled={addScheduleSaving}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl">
+                {addScheduleSaving ? '追加中...' : '追加する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 編集モーダル */}
       {editingSession && (
