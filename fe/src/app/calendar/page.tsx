@@ -159,6 +159,9 @@ export default function CalendarPage() {
             <p className="text-white/40 text-xs">
               自分が対象者になっている練習プロジェクトと、すべてのイベントを Google カレンダーに追加できます。練習はブルー、イベントはピンクで表示されます（追加後 Google カレンダーで色を変更できます）。
             </p>
+            <p className="text-white/30 text-xs">
+              一度追加すると自動で購読され、新しい練習・イベントは最大24時間以内に自動反映されます。
+            </p>
 
             <div className="space-y-2">
               <p className="text-xs font-medium text-blue-400">📘 練習プロジェクト（自分が対象）</p>
