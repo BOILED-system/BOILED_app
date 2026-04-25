@@ -44,7 +44,7 @@ func (h *CalendarHandler) PracticesICal(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	jst, _ := time.LoadLocation("Asia/Tokyo")
+	jst := jstLocation()
 	now := time.Now().UTC().Format("20060102T150405Z")
 
 	var b strings.Builder
@@ -79,7 +79,7 @@ func (h *CalendarHandler) EventsICal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jst, _ := time.LoadLocation("Asia/Tokyo")
+	jst := jstLocation()
 	now := time.Now().UTC().Format("20060102T150405Z")
 
 	var b strings.Builder
@@ -140,6 +140,15 @@ func writeICalResponse(w http.ResponseWriter, filename, body string) {
 	w.Header().Set("Content-Disposition", "inline; filename="+filename)
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	_, _ = w.Write([]byte(body))
+}
+
+// jstLocation returns Asia/Tokyo, falling back to a fixed UTC+9 offset when
+// the container image lacks tzdata.
+func jstLocation() *time.Location {
+	if loc, err := time.LoadLocation("Asia/Tokyo"); err == nil && loc != nil {
+		return loc
+	}
+	return time.FixedZone("JST", 9*60*60)
 }
 
 // parseSessionRange parses date + start/end times (HH:MM) in JST and returns
