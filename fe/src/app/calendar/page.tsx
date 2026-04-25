@@ -84,15 +84,12 @@ export default function CalendarPage() {
       });
 
       const eventItems: CalendarItem[] = events.map(ev => {
-        const startT = ev.meetingTime || '10:00';
-        const endT = addHours(startT, 2);
         const loc = ev.location || ev.meetingLocation || '';
         const title = loc ? `${ev.title} / ${loc}` : ev.title;
         return {
           id: `ev-${ev.id}`,
           title,
-          start: buildDateTime(ev.date, startT),
-          end: buildDateTime(ev.date, endT),
+          start: ev.date,
           type: 'event',
           url: `/events/${ev.id}`,
           color: EVENT_COLOR,
