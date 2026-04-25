@@ -165,8 +165,26 @@ export default function PaymentsPage() {
   const toggleGeneration = (gen: number) =>
     setForm(f => ({ ...f, targetGenerations: f.targetGenerations.includes(gen) ? f.targetGenerations.filter(g => g !== gen) : [...f.targetGenerations, gen] }));
 
-  const togglePaymentMethod = (m: PaymentMethod) =>
-    setForm(f => ({ ...f, paymentMethods: f.paymentMethods.includes(m) ? f.paymentMethods.filter(x => x !== m) : [...f.paymentMethods, m] }));
+  const togglePaymentMethod = (m: PaymentMethod) => {
+    setForm(f => {
+      const isAdding = !f.paymentMethods.includes(m);
+      const newMethods = isAdding ? [...f.paymentMethods, m] : f.paymentMethods.filter(x => x !== m);
+      if (!isAdding) return { ...f, paymentMethods: newMethods };
+
+      const updates: Partial<typeof EMPTY_FORM> = { paymentMethods: newMethods };
+      if (m === 'bank' && !f.bankInfo) {
+        updates.bankInfo = localStorage.getItem('myBankInfo') ?? '';
+      }
+      if (m === 'paypay' && !f.paypayInfo) {
+        updates.paypayInfo = localStorage.getItem('myPayPayInfo') ?? '';
+      }
+      if (m === 'cash' && f.cashCollectors.length === 0) {
+        const me = allUsers.find(u => u.memberId === memberId);
+        updates.cashCollectors = [{ memberId, name: userName, genre: me?.genre, generation: me?.generation }];
+      }
+      return { ...f, ...updates };
+    });
+  };
 
   const handleAddTarget = (m: { id: string; name: string }) => {
     setTargetMembers(prev => [...prev, m]);
@@ -245,10 +263,13 @@ export default function PaymentsPage() {
           payments = [...payments, { memberId: extra.id, name: extra.name }];
         }
       }
-      // excludedMemberIds を除外
-      const excludedSet = new Set(form.excludedMemberIds);
+      // excludedMemberIds を除外、かつ作成者自身を除外
+      const excludedSet = new Set([...form.excludedMemberIds, memberId]);
       resolvedMemberIds = resolvedMemberIds.filter(id => !excludedSet.has(id));
       payments = payments.filter(p => !excludedSet.has(p.memberId));
+
+      if (form.bankInfo) localStorage.setItem('myBankInfo', form.bankInfo);
+      if (form.paypayInfo) localStorage.setItem('myPayPayInfo', form.paypayInfo);
 
       await createSettlement(
         { title: form.title, amount: Number(form.amount), dueDate: form.dueDate, note: form.note, createdBy: memberId, createdByName: userName, targetType: form.targetType, targetGenres: form.targetGenres, targetGenerations: form.targetGenerations, targetNumberId: form.targetNumberId, targetMemberIds: form.targetMemberIds, additionalMemberIds: form.additionalMemberIds, excludedMemberIds: form.excludedMemberIds, resolvedMemberIds, paymentMethods: form.paymentMethods, bankInfo: form.bankInfo, paypayInfo: form.paypayInfo, cashCollectors: form.cashCollectors, requiresConfirmation: form.requiresConfirmation },
@@ -357,7 +378,13 @@ export default function PaymentsPage() {
     }
     setSubmittingReport(true);
     const requiresConfirmation = reportingSettlement.requiresConfirmation ?? false;
-    await reportPayment(reportingSettlement.id, memberId, selectedMethod, requiresConfirmation, selectedCollector?.memberId, selectedCollector?.name);
+    try {
+      await reportPayment(reportingSettlement.id, memberId, selectedMethod, requiresConfirmation, selectedCollector?.memberId, selectedCollector?.name);
+    } catch {
+      alert('報告に失敗しました。もう一度お試しください。');
+      setSubmittingReport(false);
+      return;
+    }
     const newStatus: PaymentStatus = requiresConfirmation ? 'reported' : 'confirmed';
     setMyRecords(prev => ({
       ...prev,
