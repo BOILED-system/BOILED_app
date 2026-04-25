@@ -361,3 +361,24 @@ export async function getMyUnpaidSettlements(memberId: string): Promise<Settleme
   );
   return unpaid.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 }
+
+// ===== LINE Messages =====
+
+export interface LineMessage {
+  id: string;
+  lineMessageId: string;
+  userId: string;
+  groupId: string;
+  text: string;
+  linkedEventId?: string;
+  createdAt: any;
+}
+
+export async function getLineMessages(eventId?: string): Promise<LineMessage[]> {
+  const query = eventId ? `?eventId=${eventId}` : '';
+  return apiGet<LineMessage[]>(`/api/line/messages${query}`);
+}
+
+export async function linkLineMessageToEvent(id: string, eventId: string): Promise<void> {
+  await apiPut(`/api/line/messages/${id}/link`, { eventId });
+}

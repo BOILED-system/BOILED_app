@@ -13,6 +13,13 @@ func SetupFECalendar(mux *http.ServeMux, calHandler *handler.CalendarHandler) {
 	mux.HandleFunc("GET /api/calendar/events.ics", calHandler.EventsICal)
 }
 
+// SetupLINE registers LINE webhook and message endpoints.
+func SetupLINE(mux *http.ServeMux, lineHandler *handler.LineWebhookHandler) {
+	mux.HandleFunc("POST /api/line/webhook", lineHandler.Webhook)
+	mux.HandleFunc("GET /api/line/messages", lineHandler.GetMessages)
+	mux.HandleFunc("PUT /api/line/messages/{id}/link", lineHandler.LinkMessage)
+}
+
 // SetupFE configures all FE-compatible routes under /api prefix.
 func SetupFE(mux *http.ServeMux, feHandler *handler.FEHandler) {
 	// Auth

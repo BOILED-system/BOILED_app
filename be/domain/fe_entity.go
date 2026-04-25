@@ -129,3 +129,15 @@ type FEEvent struct {
 	CreatedByName     string         `json:"createdByName" firestore:"createdByName"`
 	CreatedAt         any            `json:"createdAt" firestore:"createdAt"`
 }
+
+
+// FELineMessage represents a raw message received from LINE webhook.
+type FELineMessage struct {
+	ID            string `json:"id" firestore:"id"`
+	LineMessageID string `json:"lineMessageId" firestore:"lineMessageId"` // LINEのメッセージID（重複防止）
+	UserID        string `json:"userId" firestore:"userId"`
+	GroupID       string `json:"groupId" firestore:"groupId"`
+	Text          string `json:"text" firestore:"text"`
+	LinkedEventID string `json:"linkedEventId,omitempty" firestore:"linkedEventId,omitempty"`
+	CreatedAt     any    `json:"createdAt" firestore:"createdAt"`
+}

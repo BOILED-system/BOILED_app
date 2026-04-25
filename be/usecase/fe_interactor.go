@@ -11,13 +11,14 @@ import (
 
 // FEInteractor handles all FE-compatible operations.
 type FEInteractor struct {
-	userRepo       port.FEUserRepository
-	sessionRepo    port.FEPracticeSessionRepository
-	rsvpRepo       port.FEPracticeRSVPRepository
-	rosterRepo     port.NumberRosterRepository
-	eventRepo      port.FEEventRepository
-	settlementRepo port.FESettlementRepository
-	paymentRepo    port.FEPaymentRepository
+	userRepo        port.FEUserRepository
+	sessionRepo     port.FEPracticeSessionRepository
+	rsvpRepo        port.FEPracticeRSVPRepository
+	rosterRepo      port.NumberRosterRepository
+	eventRepo       port.FEEventRepository
+	settlementRepo  port.FESettlementRepository
+	paymentRepo     port.FEPaymentRepository
+	lineMessageRepo port.FELineMessageRepository
 }
 
 func NewFEInteractor(
@@ -28,15 +29,17 @@ func NewFEInteractor(
 	eventRepo port.FEEventRepository,
 	settlementRepo port.FESettlementRepository,
 	paymentRepo port.FEPaymentRepository,
+	lineMessageRepo port.FELineMessageRepository,
 ) *FEInteractor {
 	return &FEInteractor{
-		userRepo:       userRepo,
-		sessionRepo:    sessionRepo,
-		rsvpRepo:       rsvpRepo,
-		rosterRepo:     rosterRepo,
-		eventRepo:      eventRepo,
-		settlementRepo: settlementRepo,
-		paymentRepo:    paymentRepo,
+		userRepo:        userRepo,
+		sessionRepo:     sessionRepo,
+		rsvpRepo:        rsvpRepo,
+		rosterRepo:      rosterRepo,
+		eventRepo:       eventRepo,
+		settlementRepo:  settlementRepo,
+		paymentRepo:     paymentRepo,
+		lineMessageRepo: lineMessageRepo,
 	}
 }
 
@@ -243,4 +246,26 @@ func (i *FEInteractor) AddPaymentRecord(ctx context.Context, settlementID string
 	return i.settlementRepo.Update(ctx, settlementID, map[string]interface{}{
 		"resolvedMemberIds": newResolved,
 	})
+}
+
+// ===== LINE Messages =====
+
+func (i *FEInteractor) SaveLineMessage(ctx context.Context, m *domain.FELineMessage) error {
+	return i.lineMessageRepo.Save(ctx, m)
+}
+
+func (i *FEInteractor) GetLineMessages(ctx context.Context) ([]*domain.FELineMessage, error) {
+	return i.lineMessageRepo.GetAll(ctx)
+}
+
+func (i *FEInteractor) GetLineMessagesByEvent(ctx context.Context, eventID string) ([]*domain.FELineMessage, error) {
+	return i.lineMessageRepo.GetByEventID(ctx, eventID)
+}
+
+func (i *FEInteractor) LinkLineMessageToEvent(ctx context.Context, id, eventID string) error {
+	return i.lineMessageRepo.LinkToEvent(ctx, id, eventID)
+}
+
+func (i *FEInteractor) LineMessageExists(ctx context.Context, lineMessageID string) (bool, error) {
+	return i.lineMessageRepo.ExistsByLineMessageID(ctx, lineMessageID)
 }

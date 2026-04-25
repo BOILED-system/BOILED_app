@@ -80,6 +80,7 @@ func main() {
 	feEventRepo := cacheRepo.NewFEEventRepository(firestoreRepo.NewFEEventRepository(firestoreClient), cacheStore)
 	feSettlementRepo := cacheRepo.NewFESettlementRepository(firestoreRepo.NewFESettlementRepository(firestoreClient), cacheStore)
 	fePaymentRepo := cacheRepo.NewFEPaymentRepository(firestoreRepo.NewFEPaymentRepository(firestoreClient), cacheStore)
+	feLineMessageRepo := firestoreRepo.NewFELineMessageRepository(firestoreClient)
 
 	// Initialize AI service (infra layer)
 	aiService := gemini.NewAIService(geminiAPIKey)
@@ -98,6 +99,7 @@ func main() {
 	feInteractor := usecase.NewFEInteractor(
 		feUserRepo, fePracticeSessionRepo, fePracticeRSVPRepo,
 		feRosterRepo, feEventRepo, feSettlementRepo, fePaymentRepo,
+		feLineMessageRepo,
 	)
 
 	// Initialize handlers (adapter layer) — existing
@@ -113,6 +115,7 @@ func main() {
 	// Initialize FE-compatible handler (adapter layer)
 	feHandler := handler.NewFEHandler(feInteractor)
 	calendarHandler := handler.NewCalendarHandler(feInteractor)
+	lineWebhookHandler := handler.NewLineWebhookHandler(feInteractor)
 
 	// Setup router — existing routes
 	mux := router.Setup(
@@ -129,6 +132,7 @@ func main() {
 	// Setup FE-compatible routes under /api prefix
 	router.SetupFE(mux, feHandler)
 	router.SetupFECalendar(mux, calendarHandler)
+	router.SetupLINE(mux, lineWebhookHandler)
 
 	// Setup CORS
 	c := cors.New(cors.Options{

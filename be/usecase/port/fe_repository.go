@@ -63,3 +63,12 @@ type FEPaymentRepository interface {
 	GetBySettlement(ctx context.Context, settlementID string) ([]*domain.FEPaymentRecord, error)
 	Update(ctx context.Context, settlementID, memberID string, data map[string]interface{}) error
 }
+
+// FELineMessageRepository defines LINE message data access.
+type FELineMessageRepository interface {
+	Save(ctx context.Context, m *domain.FELineMessage) error
+	GetAll(ctx context.Context) ([]*domain.FELineMessage, error)
+	GetByEventID(ctx context.Context, eventID string) ([]*domain.FELineMessage, error)
+	LinkToEvent(ctx context.Context, id, eventID string) error
+	ExistsByLineMessageID(ctx context.Context, lineMessageID string) (bool, error)
+}
