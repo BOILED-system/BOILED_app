@@ -34,10 +34,12 @@ export default function EventDetailPage() {
     setMemberId(localStorage.getItem('memberId') || '');
     Promise.all([
       getEvent(id),
-      getLineMessages(id),
+      getLineMessages(id).catch(() => [] as LineMessage[]),
     ]).then(([ev, msgs]) => {
       setEvent(ev);
       setLineMessages(msgs);
+      setLoading(false);
+    }).catch(() => {
       setLoading(false);
     });
   }, [id]);

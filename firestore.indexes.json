@@ -41,6 +41,20 @@
                     "order": "DESCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "lineMessages",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "linkedEventId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
         }
     ],
     "fieldOverrides": []
