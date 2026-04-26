@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/noa/circle-app/api/adapter/http/dto"
 	"github.com/noa/circle-app/api/domain"
@@ -482,4 +484,53 @@ func (h *FEHandler) DeleteSettlementFE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ===== Sheet Sync =====
+
+// SyncPracticesFromSheet handles POST /api/admin/sync-practices
+// Google Apps Script から定期的に呼び出され、スプレッドシートの練習日程を一括同期する。
+// X-Sync-Token ヘッダーで SHEET_SYNC_SECRET 環境変数と照合する。
+func (h *FEHandler) SyncPracticesFromSheet(w http.ResponseWriter, r *http.Request) {
+	secret := os.Getenv("SHEET_SYNC_SECRET")
+	if secret == "" || r.Header.Get("X-Sync-Token") != secret {
+		writeError(w, http.StatusForbidden, "invalid token")
+		return
+	}
+
+	var req dto.SyncPracticesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	sessions := make([]*domain.FEPracticeSession, 0, len(req.Sessions))
+	for _, s := range req.Sessions {
+		sessions = append(sessions, &domain.FEPracticeSession{
+			Name:              s.Name,
+			Date:              s.Date,
+			StartTime:         s.StartTime,
+			EndTime:           s.EndTime,
+			Location:          s.Location,
+			Note:              "",
+			Type:              s.Type,
+			TargetType:        "genre_generation",
+			TargetGenres:      s.TargetGenres,
+			TargetGenerations: []int{},
+			TargetNumberID:    "",
+			TargetMemberIDs:   []string{},
+			AdditionalMemberIDs: []string{},
+			ExcludedMemberIDs:   []string{},
+			CreatedBy:           "sheet-sync",
+			CreatedByName:       "スプレッドシート同期",
+			CreatedAt:           time.Now(),
+		})
+	}
+
+	count, err := h.interactor.SyncPracticesFromSheet(r.Context(), sessions)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"created": count})
 }

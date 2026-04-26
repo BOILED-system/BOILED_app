@@ -79,6 +79,31 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 	return i.sessionRepo.Delete(ctx, id)
 }
 
+// SyncPracticesFromSheet は既存と重複しないセッションのみ登録する。
+// 重複判定は date + name の組み合わせ。登録件数を返す。
+func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
+	existing, err := i.sessionRepo.GetAll(ctx)
+	if err != nil {
+		return 0, err
+	}
+	existingKeys := make(map[string]struct{}, len(existing))
+	for _, s := range existing {
+		existingKeys[s.Date+"_"+s.Name] = struct{}{}
+	}
+
+	count := 0
+	for _, s := range sessions {
+		if _, dup := existingKeys[s.Date+"_"+s.Name]; dup {
+			continue
+		}
+		if err := i.sessionRepo.Create(ctx, s); err != nil {
+			return count, err
+		}
+		count++
+	}
+	return count, nil
+}
+
 // ===== Practice RSVPs =====
 
 func (i *FEInteractor) SubmitRSVP(ctx context.Context, sessionID string, rsvp *domain.FEPracticeRSVP) error {

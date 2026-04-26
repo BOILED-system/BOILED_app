@@ -55,6 +55,9 @@ func SetupFE(mux *http.ServeMux, feHandler *handler.FEHandler) {
 	mux.HandleFunc("PUT /api/events/{id}", feHandler.UpdateEventFE)
 	mux.HandleFunc("DELETE /api/events/{id}", feHandler.DeleteEventFE)
 
+	// Sheet sync (called by Google Apps Script)
+	mux.HandleFunc("POST /api/admin/sync-practices", feHandler.SyncPracticesFromSheet)
+
 	// Settlements
 	mux.HandleFunc("GET /api/settlements", feHandler.GetSettlements)
 	mux.HandleFunc("POST /api/settlements", feHandler.CreateSettlementFE)

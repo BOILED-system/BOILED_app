@@ -101,3 +101,19 @@ type UpdatePaymentStatusRequest struct {
 	MemberID string `json:"memberId"`
 	Status   string `json:"status"`
 }
+
+// ===== Sheet Sync =====
+
+type SyncPracticeSession struct {
+	Name              string   `json:"name"`
+	Date              string   `json:"date"`
+	StartTime         string   `json:"startTime"`
+	EndTime           string   `json:"endTime"`
+	Location          string   `json:"location"`
+	Type              string   `json:"type"`
+	TargetGenres      []string `json:"targetGenres"`
+}
+
+type SyncPracticesRequest struct {
+	Sessions []SyncPracticeSession `json:"sessions"`
+}
