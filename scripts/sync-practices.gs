@@ -11,7 +11,7 @@
 // 5. トリガーを設定: 実行 → トリガーを追加 → syncPractices → 時間主導型 → 毎日
 
 // ========== 設定 ==========
-const SHEET_NAME = 'シート1'; // スプレッドシートのシート名に合わせて変更
+const SHEET_NAMES = ['日曜スタジオ', '水曜スタジオ']; // 同期対象のシート名
 const GENRE_COLS = { 3: 'Lock', 4: 'Hiphop', 5: 'Pop', 6: 'House', 7: 'Break', 8: 'Girls', 9: 'Waack' };
 
 // ========== メイン関数（トリガーで実行） ==========
@@ -24,7 +24,12 @@ function syncPractices() {
     return;
   }
 
-  const sessions = parseSessions();
+  const sessions = [];
+  for (const sheetName of SHEET_NAMES) {
+    const parsed = parseSessions(sheetName);
+    Logger.log(`${sheetName}: ${parsed.length} 件`);
+    sessions.push(...parsed);
+  }
   if (sessions.length === 0) {
     Logger.log('登録対象の練習がありません');
     return;
@@ -51,8 +56,12 @@ function syncPractices() {
 }
 
 // ========== スプレッドシートをパースしてセッション一覧を返す ==========
-function parseSessions() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+function parseSessions(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) {
+    Logger.log(`シート "${sheetName}" が見つかりません`);
+    return [];
+  }
   const lastRow = sheet.getLastRow();
   // 2行目以降（1行目はヘッダー）
   const data = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
