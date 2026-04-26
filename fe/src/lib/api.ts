@@ -212,6 +212,7 @@ export async function getEvent(id: string): Promise<BoiledEvent | null> {
 export async function createEvent(data: {
   title: string;
   date: string;
+  endDate?: string;
   location: string;
   meetingTime: string;
   meetingLocation: string;

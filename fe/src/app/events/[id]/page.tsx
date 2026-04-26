@@ -85,7 +85,12 @@ export default function EventDetailPage() {
   }
 
   const date = new Date(event.date);
-  const dateStr = `${date.getMonth() + 1}月${date.getDate()}日（${DAY_LABELS[date.getDay()]}）`;
+  const dateStr = event.endDate
+    ? (() => {
+        const end = new Date(event.endDate);
+        return `${date.getMonth() + 1}月${date.getDate()}日（${DAY_LABELS[date.getDay()]}）〜${end.getMonth() + 1}月${end.getDate()}日（${DAY_LABELS[end.getDay()]}）`;
+      })()
+    : `${date.getMonth() + 1}月${date.getDate()}日（${DAY_LABELS[date.getDay()]}）`;
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-24">

@@ -10,6 +10,7 @@ const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const EMPTY_FORM = {
   title: '',
   date: '',
+  endDate: '',
   location: '',
   meetingTime: '',
   meetingLocation: '',
@@ -23,6 +24,7 @@ export default function EventsPage() {
   const [memberId, setMemberId] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [multiDay, setMultiDay] = useState(false);
   const [timetable, setTimetable] = useState<TimetableRow[]>([]);
   const [timetableInput, setTimetableInput] = useState({ time: '', description: '' });
   const [saving, setSaving] = useState(false);
@@ -56,10 +58,11 @@ export default function EventsPage() {
       return;
     }
     setSaving(true);
-    await createEvent({ ...form, timetable, createdBy: memberId, createdByName: localStorage.getItem('userName') || '' });
+    await createEvent({ ...form, endDate: multiDay ? form.endDate : undefined, timetable, createdBy: memberId, createdByName: localStorage.getItem('userName') || '' });
     setForm(EMPTY_FORM);
     setTimetable([]);
     setTimetableInput({ time: '', description: '' });
+    setMultiDay(false);
     setShowForm(false);
     setSaving(false);
     load();
@@ -116,7 +119,7 @@ export default function EventsPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-white/30 block mb-1">日付</label>
+              <label className="text-[11px] text-white/30 block mb-1">開始日</label>
               <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
                 className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
             </div>
@@ -127,6 +130,27 @@ export default function EventsPage() {
                 className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer w-fit">
+            <input
+              type="checkbox"
+              checked={multiDay}
+              onChange={e => { setMultiDay(e.target.checked); if (!e.target.checked) setForm(f => ({ ...f, endDate: '' })); }}
+              className="w-3.5 h-3.5 rounded accent-blue-500"
+            />
+            <span className="text-xs text-white/40">複数日にまたがるイベント（合宿など）</span>
+          </label>
+
+          {multiDay && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-white/30 block mb-1">終了日</label>
+                <input type="date" value={form.endDate} min={form.date}
+                  onChange={e => setForm({ ...form, endDate: e.target.value })}
+                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -195,14 +219,25 @@ export default function EventsPage() {
         <div className="space-y-2">
           {upcoming.map(event => {
             const date = new Date(event.date);
+            const endDate = event.endDate ? new Date(event.endDate) : null;
             return (
               <div key={event.id} className="group relative">
                 <Link href={`/events/${event.id}`}
                   className="flex items-center gap-4 bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.06] transition-colors">
                   <div className="flex flex-col items-center w-10 shrink-0">
-                    <span className="text-[10px] text-white/30">{date.getMonth() + 1}月</span>
-                    <span className="text-xl font-semibold text-white leading-tight">{date.getDate()}</span>
-                    <span className="text-[10px] text-white/30">{DAY_LABELS[date.getDay()]}</span>
+                    {endDate ? (
+                      <>
+                        <span className="text-[10px] text-white/50 font-medium leading-tight">{date.getMonth() + 1}/{date.getDate()}</span>
+                        <span className="text-[10px] text-white/30 leading-tight">〜</span>
+                        <span className="text-[10px] text-white/50 font-medium leading-tight">{endDate.getMonth() + 1}/{endDate.getDate()}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] text-white/30">{date.getMonth() + 1}月</span>
+                        <span className="text-xl font-semibold text-white leading-tight">{date.getDate()}</span>
+                        <span className="text-[10px] text-white/30">{DAY_LABELS[date.getDay()]}</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium text-white truncate">{event.title}</h3>
@@ -231,14 +266,25 @@ export default function EventsPage() {
           <p className="text-xs text-white/20 font-medium uppercase tracking-wider px-1">過去のイベント</p>
           {past.map(event => {
             const date = new Date(event.date);
+            const endDate = event.endDate ? new Date(event.endDate) : null;
             return (
               <div key={event.id} className="group relative">
                 <Link href={`/events/${event.id}`}
                   className="flex items-center gap-4 bg-white/[0.02] border border-white/[0.04] rounded-xl p-4 opacity-50 hover:opacity-70 transition-opacity">
                   <div className="flex flex-col items-center w-10 shrink-0">
-                    <span className="text-[10px] text-white/30">{date.getMonth() + 1}月</span>
-                    <span className="text-xl font-semibold text-white leading-tight">{date.getDate()}</span>
-                    <span className="text-[10px] text-white/30">{DAY_LABELS[date.getDay()]}</span>
+                    {endDate ? (
+                      <>
+                        <span className="text-[10px] text-white/50 font-medium leading-tight">{date.getMonth() + 1}/{date.getDate()}</span>
+                        <span className="text-[10px] text-white/30 leading-tight">〜</span>
+                        <span className="text-[10px] text-white/50 font-medium leading-tight">{endDate.getMonth() + 1}/{endDate.getDate()}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] text-white/30">{date.getMonth() + 1}月</span>
+                        <span className="text-xl font-semibold text-white leading-tight">{date.getDate()}</span>
+                        <span className="text-[10px] text-white/30">{DAY_LABELS[date.getDay()]}</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium text-white truncate">{event.title}</h3>

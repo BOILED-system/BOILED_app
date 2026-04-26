@@ -97,7 +97,7 @@ func (h *CalendarHandler) EventsICal(w http.ResponseWriter, r *http.Request) {
 		if loc != "" {
 			summary = e.Title + " / " + loc
 		}
-		writeAllDayVEvent(&b, "event-"+e.ID, now, e.Date, summary, loc)
+		writeAllDayVEvent(&b, "event-"+e.ID, now, e.Date, e.EndDate, summary, loc)
 	}
 	_ = jst
 
@@ -117,14 +117,24 @@ func writeICalHeader(b *strings.Builder, calName string) {
 	b.WriteString("X-WR-TIMEZONE:Asia/Tokyo\r\n")
 }
 
-func writeAllDayVEvent(b *strings.Builder, uid, dtstamp, date, summary, location string) {
-	// Parse date as YYYY-MM-DD and format as YYYYMMDD for iCal VALUE=DATE
+func writeAllDayVEvent(b *strings.Builder, uid, dtstamp, date, endDate, summary, location string) {
 	d := strings.ReplaceAll(date, "-", "")
-	// DTEND for all-day is the next day (exclusive)
-	t, err := time.Parse("20060102", d)
-	nextDay := d
-	if err == nil {
-		nextDay = t.AddDate(0, 0, 1).Format("20060102")
+	// DTEND is exclusive: use endDate+1 day for multi-day, or date+1 day for single-day
+	var nextDay string
+	if endDate != "" {
+		ed := strings.ReplaceAll(endDate, "-", "")
+		t, err := time.Parse("20060102", ed)
+		if err == nil {
+			nextDay = t.AddDate(0, 0, 1).Format("20060102")
+		} else {
+			nextDay = ed
+		}
+	} else {
+		t, err := time.Parse("20060102", d)
+		nextDay = d
+		if err == nil {
+			nextDay = t.AddDate(0, 0, 1).Format("20060102")
+		}
 	}
 	b.WriteString("BEGIN:VEVENT\r\n")
 	b.WriteString("UID:" + uid + "@boiled\r\n")

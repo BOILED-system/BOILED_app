@@ -118,6 +118,7 @@ type FEEvent struct {
 	ID                string         `json:"id" firestore:"id"`
 	Title             string         `json:"title" firestore:"title"`
 	Date              string         `json:"date" firestore:"date"`
+	EndDate           string         `json:"endDate,omitempty" firestore:"endDate,omitempty"`
 	Location          string         `json:"location" firestore:"location"`
 	MeetingTime       string         `json:"meetingTime" firestore:"meetingTime"`
 	MeetingLocation   string         `json:"meetingLocation" firestore:"meetingLocation"`

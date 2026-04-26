@@ -67,6 +67,7 @@ export interface BoiledEvent {
   id: string;
   title: string;
   date: string;
+  endDate?: string;
   location: string;
   meetingTime: string;
   meetingLocation: string;

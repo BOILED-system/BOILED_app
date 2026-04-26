@@ -40,11 +40,13 @@ export default function EditEventPage() {
   const [form, setForm] = useState({
     title: '',
     date: '',
+    endDate: '',
     location: '',
     meetingTime: '',
     meetingLocation: '',
     note: '',
   });
+  const [multiDay, setMultiDay] = useState(false);
   const [timetable, setTimetable] = useState<TimetableRow[]>([]);
   const [timetableMode, setTimetableMode] = useState<'text' | 'image'>('text');
   const [pasteText, setPasteText] = useState('');
@@ -61,11 +63,13 @@ export default function EditEventPage() {
       setForm({
         title: event.title || '',
         date: event.date || '',
+        endDate: event.endDate || '',
         location: event.location || '',
         meetingTime: event.meetingTime || '',
         meetingLocation: event.meetingLocation || '',
         note: event.note || '',
       });
+      setMultiDay(!!event.endDate);
       setTimetable(event.timetable || []);
       setTimetableImageUrl(event.timetableImageUrl || '');
       setImageUrls(event.imageUrls || []);
@@ -137,6 +141,7 @@ export default function EditEventPage() {
     setSaving(true);
     await updateEvent(id, {
       ...form,
+      endDate: multiDay ? form.endDate : '',
       timetable: timetableMode === 'text' ? timetable : [],
       timetableImageUrl: timetableMode === 'image' ? timetableImageUrl : '',
       imageUrls,
@@ -180,7 +185,7 @@ export default function EditEventPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-white/30 block mb-1">日付</label>
+            <label className="text-[11px] text-white/30 block mb-1">開始日</label>
             <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
               className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
           </div>
@@ -191,6 +196,27 @@ export default function EditEventPage() {
               className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
           </div>
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer w-fit">
+          <input
+            type="checkbox"
+            checked={multiDay}
+            onChange={e => { setMultiDay(e.target.checked); if (!e.target.checked) setForm(f => ({ ...f, endDate: '' })); }}
+            className="w-3.5 h-3.5 rounded accent-blue-500"
+          />
+          <span className="text-xs text-white/40">複数日にまたがるイベント（合宿など）</span>
+        </label>
+
+        {multiDay && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-white/30 block mb-1">終了日</label>
+              <input type="date" value={form.endDate} min={form.date}
+                onChange={e => setForm({ ...form, endDate: e.target.value })}
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
