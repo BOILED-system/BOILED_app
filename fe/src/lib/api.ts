@@ -337,12 +337,13 @@ export async function getUpcomingUnregisteredSessions(memberId: string): Promise
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const nextMonth = new Date(today);
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
 
   const upcoming = sessions.filter(s => {
     if (!isSessionForMember(s, memberId, genre, generation, rosters)) return false;
     const d = new Date(s.date);
-    return d >= today && d <= nextWeek;
+    return d >= today && d <= nextMonth;
   });
 
   const myRSVPs = await getMyRSVPs(memberId);
