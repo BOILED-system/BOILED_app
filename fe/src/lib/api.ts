@@ -347,7 +347,9 @@ export async function getUpcomingUnregisteredSessions(memberId: string): Promise
   });
 
   const myRSVPs = await getMyRSVPs(memberId);
-  return upcoming.filter(session => !myRSVPs[session.id]);
+  return upcoming
+    .filter(session => !myRSVPs[session.id])
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 export async function getMyUnpaidSettlements(memberId: string): Promise<Settlement[]> {
