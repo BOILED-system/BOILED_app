@@ -6,8 +6,11 @@ import {
   getUser,
   getUpcomingUnregisteredSessions,
   getMyUnpaidSettlements,
+  submitRSVP,
 } from "@/lib/api";
 import type { PracticeSession, Settlement } from "@/lib/api";
+
+const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
 
 export default function ProfilePage() {
   const [user, setUser] = useState<{
@@ -17,12 +20,15 @@ export default function ProfilePage() {
     role: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [memberId, setMemberId] = useState('');
   const [unregistered, setUnregistered] = useState<PracticeSession[]>([]);
   const [unpaidSettlements, setUnpaidSettlements] = useState<Settlement[]>([]);
+  const [submitting, setSubmitting] = useState<string | null>(null);
 
   useEffect(() => {
     const memberId = localStorage.getItem("memberId");
     if (!memberId) { window.location.href = "/"; return; }
+    setMemberId(memberId);
 
     getUser(memberId).then((u) => {
       if (!u) { window.location.href = "/"; return; }
@@ -39,6 +45,28 @@ export default function ProfilePage() {
       }).catch(console.error);
     }).catch(() => setLoading(false));
   }, []);
+
+  const handleRSVP = async (session: PracticeSession, status: 'GO' | 'NO' | 'LATE' | 'EARLY') => {
+    if (!user || !memberId) return;
+    setSubmitting(session.id);
+    try {
+      await submitRSVP({
+        sessionId: session.id,
+        memberId,
+        name: (user as any).name,
+        genre: (user as any).genre,
+        generation: (user as any).generation,
+        status,
+        note: '',
+      });
+      setUnregistered(prev => prev.filter(s => s.id !== session.id));
+    } catch (e) {
+      console.error(e);
+      alert('登録に失敗しました');
+    } finally {
+      setSubmitting(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -86,21 +114,30 @@ export default function ProfilePage() {
           <div className="space-y-2">
             {/* 出欠未登録 */}
             {unregistered.map(session => (
-              <Link
-                key={session.id}
-                href={`/practices/project/${encodeURIComponent(session.name)}`}
-                className="flex items-center justify-between bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 hover:bg-yellow-500/15 transition-colors group"
-              >
-                <div className="min-w-0 flex-1">
+              <div key={session.id} className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 space-y-3">
+                <div className="min-w-0">
                   <p className="text-[11px] font-medium text-yellow-400 uppercase tracking-wide">出欠未登録</p>
-                  <p className="text-sm text-white/80 mt-0.5 truncate">{session.name}</p>
+                  <p className="text-sm font-bold text-white mt-0.5">{session.name}</p>
                   <p className="text-xs text-white/40 mt-0.5">
-                    {session.date} {session.startTime}
+                    {session.date} {session.startTime}{session.endTime ? `〜${session.endTime}` : ''}
                     {session.location && ` · ${session.location}`}
                   </p>
                 </div>
-                <span className="text-yellow-400/60 text-xs ml-3 group-hover:text-yellow-400 transition-colors shrink-0">登録 →</span>
-              </Link>
+                <div className="flex gap-2">
+                  {(['GO', 'NO', 'LATE', 'EARLY'] as const).map(s => (
+                    <button key={s}
+                      disabled={submitting === session.id}
+                      onClick={() => handleRSVP(session, s)}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors disabled:opacity-40 ${
+                        s === 'GO'    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30' :
+                        s === 'NO'    ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30' :
+                                        'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30'
+                      }`}>
+                      {submitting === session.id ? '…' : STATUS_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
 
             {/* 未払い精算 */}
