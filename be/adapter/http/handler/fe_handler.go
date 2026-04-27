@@ -532,5 +532,5 @@ func (h *FEHandler) SyncPracticesFromSheet(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int{"created": count})
+	writeJSON(w, http.StatusOK, map[string]int{"synced": count})
 }

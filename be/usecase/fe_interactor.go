@@ -79,29 +79,37 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 	return i.sessionRepo.Delete(ctx, id)
 }
 
-// SyncPracticesFromSheet は既存と重複しないセッションのみ登録する。
-// 重複判定は date + name の組み合わせ。登録件数を返す。
+// SyncPracticesFromSheet は date+name をキーに upsert する。
+// 既存セッションは startTime/endTime/location を上書き更新し、新規は作成する。
+// 戻り値は作成件数。
 func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
 	existing, err := i.sessionRepo.GetAll(ctx)
 	if err != nil {
 		return 0, err
 	}
-	existingKeys := make(map[string]struct{}, len(existing))
+	existingMap := make(map[string]*domain.FEPracticeSession, len(existing))
 	for _, s := range existing {
-		existingKeys[s.Date+"_"+s.Name] = struct{}{}
+		existingMap[s.Date+"_"+s.Name] = s
 	}
 
-	count := 0
+	created := 0
 	for _, s := range sessions {
-		if _, dup := existingKeys[s.Date+"_"+s.Name]; dup {
-			continue
+		if ex, dup := existingMap[s.Date+"_"+s.Name]; dup {
+			if err := i.sessionRepo.Update(ctx, ex.ID, map[string]interface{}{
+				"startTime": s.StartTime,
+				"endTime":   s.EndTime,
+				"location":  s.Location,
+			}); err != nil {
+				return created, err
+			}
+		} else {
+			if err := i.sessionRepo.Create(ctx, s); err != nil {
+				return created, err
+			}
+			created++
 		}
-		if err := i.sessionRepo.Create(ctx, s); err != nil {
-			return count, err
-		}
-		count++
 	}
-	return count, nil
+	return created, nil
 }
 
 // ===== Practice RSVPs =====
