@@ -355,15 +355,18 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
           </Link>
         </div>
 
-        <div className="space-y-6">
-          {groupSessions.map((session, index) => {
+        {(() => {
+          const todayJST = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date());
+          const upcoming = groupSessions.filter(s => s.date >= todayJST);
+          const past = [...groupSessions.filter(s => s.date < todayJST)].reverse();
+
+          const renderSession = (session: typeof groupSessions[0], index: number, dimmed = false) => {
             const currentRSVP = myRSVPs[session.id];
             const editedRSVP = editingRSVPs[session.id];
             const status = editedRSVP?.status || currentRSVP?.status || '';
             const note = editedRSVP?.note ?? (currentRSVP?.note || '');
-
             return (
-              <div key={session.id} className={`${index > 0 ? 'border-t border-white/[0.04] pt-6' : ''}`}>
+              <div key={session.id} className={`${index > 0 ? 'border-t border-white/[0.04] pt-6' : ''} ${dimmed ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h2 className="text-base font-bold text-white">
@@ -376,37 +379,47 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                     )}
                   </div>
                   {(!session.createdBy || session.createdBy === memberId) && (
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    <button onClick={() => openEdit(session)} className="text-xs bg-white/[0.06] text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/[0.1] whitespace-nowrap">編集</button>
-                    <button onClick={() => handleDelete(session)} className="text-xs bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/20 whitespace-nowrap">削除</button>
-                  </div>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <button onClick={() => openEdit(session)} className="text-xs bg-white/[0.06] text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/[0.1] whitespace-nowrap">編集</button>
+                      <button onClick={() => handleDelete(session)} className="text-xs bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/20 whitespace-nowrap">削除</button>
+                    </div>
                   )}
                 </div>
-
-                {/* 出欠入力UI */}
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2">
                     {(['GO', 'NO', 'LATE', 'EARLY']).map(s => (
-                      <button
-                        key={s}
-                        onClick={() => handleBulkRSVPChange(session.id, s, note)}
-                        className={`flex-1 py-2 text-[13px] font-bold rounded-lg border transition-colors ${status === s ? STATUS_COLORS[s] : 'bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08]'}`}
-                      >
+                      <button key={s} onClick={() => handleBulkRSVPChange(session.id, s, note)}
+                        className={`flex-1 py-2 text-[13px] font-bold rounded-lg border transition-colors ${status === s ? STATUS_COLORS[s] : 'bg-white/[0.04] text-white/40 border-white/[0.08] hover:bg-white/[0.08]'}`}>
                         {STATUS_LABELS[s]}
                       </button>
                     ))}
                   </div>
                   {(status === 'LATE' || status === 'EARLY' || status === 'NO') && (
-                    <input type="text" placeholder={`理由（任意）`} value={note}
+                    <input type="text" placeholder="理由（任意）" value={note}
                       onChange={e => handleBulkRSVPChange(session.id, status, e.target.value)}
-                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none"
-                    />
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
                   )}
                 </div>
               </div>
             );
-          })}
-        </div>
+          };
+
+          return (
+            <div className="space-y-6">
+              {upcoming.map((s, i) => renderSession(s, i))}
+              {past.length > 0 && (
+                <>
+                  <div className="border-t border-white/[0.08] pt-4 mt-4">
+                    <p className="text-[11px] font-bold text-white/20 uppercase tracking-wider mb-4">過去の日程</p>
+                    <div className="space-y-6">
+                      {past.map((s, i) => renderSession(s, i, true))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 一括保存ボタン */}
         <div className="pt-6 mt-6 border-t border-white/[0.08] flex justify-end sticky bottom-4">
