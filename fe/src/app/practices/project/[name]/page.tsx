@@ -69,6 +69,11 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
   // プロジェクト全体の対象者編集ステート
   const [showProjectMembers, setShowProjectMembers] = useState(false);
+  const [projectTargetType, setProjectTargetType] = useState<TargetType>('genre_generation');
+  const [projectTargetGenres, setProjectTargetGenres] = useState<string[]>([]);
+  const [projectTargetGenerations, setProjectTargetGenerations] = useState<number[]>([]);
+  const [projectTargetNumberId, setProjectTargetNumberId] = useState('');
+  const [projectTargetMembers, setProjectTargetMembers] = useState<{ id: string; name: string }[]>([]);
   const [projectAdditional, setProjectAdditional] = useState<{ id: string; name: string }[]>([]);
   const [projectExcluded, setProjectExcluded] = useState<{ id: string; name: string }[]>([]);
   const [projectSaving, setProjectSaving] = useState(false);
@@ -255,6 +260,13 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       const u = allUsers.find(u => u.memberId === id);
       return { id, name: u?.name || id };
     };
+    const base = groupSessions[0];
+    setProjectTargetType(base?.targetType || 'genre_generation');
+    setProjectTargetGenres(base?.targetGenres || []);
+    setProjectTargetGenerations(base?.targetGenerations || []);
+    setProjectTargetNumberId(base?.targetNumberId || '');
+    const memberIds = Array.from(new Set(groupSessions.flatMap(s => s.targetMemberIds || [])));
+    setProjectTargetMembers(memberIds.map(toMember));
     const additionalIds = Array.from(new Set(groupSessions.flatMap(s => s.additionalMemberIds || [])));
     const excludedIds = Array.from(new Set(groupSessions.flatMap(s => s.excludedMemberIds || [])));
     setProjectAdditional(additionalIds.map(toMember));
@@ -265,19 +277,17 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const handleSaveProjectMembers = async () => {
     setProjectSaving(true);
     try {
-      const additionalIds = projectAdditional.map(m => m.id);
-      const excludedIds = projectExcluded.map(m => m.id);
-      await Promise.all(groupSessions.map(s =>
-        updatePracticeSession(s.id, {
-          additionalMemberIds: additionalIds,
-          excludedMemberIds: excludedIds,
-        })
-      ));
-      setGroupSessions(prev => prev.map(s => ({
-        ...s,
-        additionalMemberIds: additionalIds,
-        excludedMemberIds: excludedIds,
-      })));
+      const updates = {
+        targetType: projectTargetType,
+        targetGenres: projectTargetGenres,
+        targetGenerations: projectTargetGenerations,
+        targetNumberId: projectTargetNumberId,
+        targetMemberIds: projectTargetMembers.map(m => m.id),
+        additionalMemberIds: projectAdditional.map(m => m.id),
+        excludedMemberIds: projectExcluded.map(m => m.id),
+      };
+      await Promise.all(groupSessions.map(s => updatePracticeSession(s.id, updates)));
+      setGroupSessions(prev => prev.map(s => ({ ...s, ...updates })));
       setShowProjectMembers(false);
     } catch (e: any) {
       console.error('[handleSaveProjectMembers]', e);
@@ -540,36 +550,109 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowProjectMembers(false)} />
           <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white">プロジェクト全体の対象者</h2>
+              <h2 className="text-base font-bold text-white">対象者を編集</h2>
               <button type="button" onClick={() => setShowProjectMembers(false)} aria-label="閉じる"
                 className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-lg">×</button>
             </div>
             <p className="text-[11px] text-white/40">ここでの変更はこのプロジェクトの<strong className="text-white/70">全日程</strong>に反映されます。</p>
 
+            {/* 対象者の指定方法 */}
             <div className="space-y-2">
-              <label className="text-[11px] text-white/30 block">追加メンバー（任意）</label>
-              <p className="text-[10px] text-white/20">対象外のメンバーのみ表示</p>
-              <MemberSelectDropdown
-                allUsers={projectUsersForAdditional}
-                selected={projectAdditional}
-                onAdd={m => setProjectAdditional(prev => [...prev, m])}
-                onRemove={id => setProjectAdditional(prev => prev.filter(m => m.id !== id))}
-                chipColor="green"
-                placeholder="追加するメンバーを選択..."
-              />
+              <label className="text-[11px] text-white/30 block">対象者の指定方法</label>
+              {([
+                { value: 'genre_generation', label: 'ジャンル・代で絞り込む' },
+                { value: 'number', label: 'ナンバー名簿から選ぶ' },
+                { value: 'individual', label: 'メンバーを個別指定' },
+              ] as const).map(opt => (
+                <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="radio" name="projectTargetType" value={opt.value}
+                    checked={projectTargetType === opt.value}
+                    onChange={() => setProjectTargetType(opt.value)}
+                    className="accent-blue-500" />
+                  <span className="text-sm text-white/60">{opt.label}</span>
+                </label>
+              ))}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[11px] text-white/30 block">除外メンバー（任意）</label>
-              <p className="text-[10px] text-white/20">対象メンバーのみ表示</p>
-              <MemberSelectDropdown
-                allUsers={projectUsersForExcluded}
-                selected={projectExcluded}
-                onAdd={m => setProjectExcluded(prev => [...prev, m])}
-                onRemove={id => setProjectExcluded(prev => prev.filter(m => m.id !== id))}
-                chipColor="red"
-                placeholder="除外するメンバーを選択..."
-              />
+            {projectTargetType === 'genre_generation' && (
+              <div className="pl-4 space-y-3">
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-2">対象ジャンル</label>
+                  <div className="flex flex-wrap gap-2">
+                    {GENRES.map(g => (
+                      <button key={g} type="button"
+                        onClick={() => setProjectTargetGenres(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g])}
+                        className={`text-xs px-3 py-1 rounded-full transition-colors ${projectTargetGenres.includes(g) ? 'bg-blue-500 text-white' : 'bg-white/[0.06] text-white/50 hover:text-white/80'}`}>
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-2">対象代</label>
+                  <div className="flex flex-wrap gap-2">
+                    {GENERATIONS.map(gen => (
+                      <button key={gen} type="button"
+                        onClick={() => setProjectTargetGenerations(prev => prev.includes(gen) ? prev.filter(x => x !== gen) : [...prev, gen])}
+                        className={`text-xs px-3 py-1 rounded-full transition-colors ${projectTargetGenerations.includes(gen) ? 'bg-purple-500 text-white' : 'bg-white/[0.06] text-white/50 hover:text-white/80'}`}>
+                        {gen}代
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {projectTargetType === 'number' && (
+              <div className="pl-4">
+                {numberRosters.length === 0 ? (
+                  <p className="text-xs text-white/30">名簿がまだありません。</p>
+                ) : (
+                  <select value={projectTargetNumberId} onChange={e => setProjectTargetNumberId(e.target.value)}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                    <option value="">名簿を選択...</option>
+                    {numberRosters.map(r => <option key={r.id} value={r.id}>{r.name}（{r.memberIds.length}人）</option>)}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {projectTargetType === 'individual' && (
+              <div className="pl-4">
+                <MemberSelectDropdown
+                  allUsers={allUsers}
+                  selected={projectTargetMembers}
+                  onAdd={m => setProjectTargetMembers(prev => [...prev, m])}
+                  onRemove={id => setProjectTargetMembers(prev => prev.filter(m => m.id !== id))}
+                  chipColor="green"
+                  placeholder="対象メンバーを選択..."
+                />
+              </div>
+            )}
+
+            <div className="border-t border-white/[0.06] pt-3 space-y-3">
+              <div className="space-y-2">
+                <label className="text-[11px] text-white/30 block">追加メンバー（任意）</label>
+                <MemberSelectDropdown
+                  allUsers={allUsers}
+                  selected={projectAdditional}
+                  onAdd={m => setProjectAdditional(prev => [...prev, m])}
+                  onRemove={id => setProjectAdditional(prev => prev.filter(m => m.id !== id))}
+                  chipColor="green"
+                  placeholder="追加するメンバーを選択..."
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] text-white/30 block">除外メンバー（任意）</label>
+                <MemberSelectDropdown
+                  allUsers={allUsers}
+                  selected={projectExcluded}
+                  onAdd={m => setProjectExcluded(prev => [...prev, m])}
+                  onRemove={id => setProjectExcluded(prev => prev.filter(m => m.id !== id))}
+                  chipColor="red"
+                  placeholder="除外するメンバーを選択..."
+                />
+              </div>
             </div>
 
             <div className="flex gap-2 pt-4 border-t border-white/[0.08]">
