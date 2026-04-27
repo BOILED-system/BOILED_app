@@ -49,7 +49,7 @@ export default function Home() {
         type="text"
         placeholder="会員番号（例：16199）"
         value={memberId}
-        onChange={(e) => setMemberId(e.target.value)}
+        onChange={(e) => setMemberId(e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)))}
         onKeyDown={(e) => e.key === "Enter" && handleLogin()}
         className="bg-gray-800 text-white px-4 py-3 rounded-lg w-72 text-center text-lg"
       />
