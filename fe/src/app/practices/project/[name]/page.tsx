@@ -340,17 +340,19 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-white truncate">{groupName}</h1>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button onClick={() => setShowAddSchedule(true)} className="text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
-            + 日程を追加
-          </button>
-          <button onClick={openProjectMembers} className="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
-            対象者を編集
-          </button>
-          <button onClick={handleDeleteProject} className="text-xs text-red-400/60 hover:text-red-400 transition-colors px-2 py-1 whitespace-nowrap">
-            プロジェクトを削除
-          </button>
-        </div>
+        {(userRole === 'admin' || !groupSessions[0]?.createdBy || groupSessions[0]?.createdBy === memberId) && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => setShowAddSchedule(true)} className="text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
+              + 日程を追加
+            </button>
+            <button onClick={openProjectMembers} className="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
+              対象者を編集
+            </button>
+            <button onClick={handleDeleteProject} className="text-xs text-red-400/60 hover:text-red-400 transition-colors px-2 py-1 whitespace-nowrap">
+              プロジェクトを削除
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-[#141824] border border-white/[0.08] rounded-xl overflow-hidden p-4 space-y-6">
@@ -388,7 +390,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                       </p>
                     )}
                   </div>
-                  {(!session.createdBy || session.createdBy === memberId) && (
+                  {(userRole === 'admin' || !session.createdBy || session.createdBy === memberId) && (
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       <button onClick={() => openEdit(session)} className="text-xs bg-white/[0.06] text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/[0.1] whitespace-nowrap">編集</button>
                       <button onClick={() => handleDelete(session)} className="text-xs bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/20 whitespace-nowrap">削除</button>

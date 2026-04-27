@@ -225,10 +225,12 @@ export default function PracticesPage() {
               <Link href="/numbers" className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
                 名簿管理
               </Link>
-              <button onClick={() => { setSelectMode(true); setShowForm(false); }}
-                className="text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors">
-                選択・削除
-              </button>
+              {userRole === 'admin' && (
+                <button onClick={() => { setSelectMode(true); setShowForm(false); }}
+                  className="text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors">
+                  選択・削除
+                </button>
+              )}
               <button onClick={() => setShowForm(!showForm)} className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors font-bold shadow-lg shadow-blue-500/20">
                 + プロジェクトを追加
               </button>

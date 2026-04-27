@@ -67,6 +67,7 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [memberId, setMemberId] = useState('');
   const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState('');
 
   // Create form
   const [showForm, setShowForm] = useState(false);
@@ -105,8 +106,10 @@ export default function PaymentsPage() {
   useEffect(() => {
     const mid = localStorage.getItem('memberId') || '';
     const name = localStorage.getItem('userName') || '';
+    const role = localStorage.getItem('userRole') || 'member';
     setMemberId(mid);
     setUserName(name);
+    setUserRole(role);
     load(mid);
   }, []);
 
@@ -154,7 +157,7 @@ export default function PaymentsPage() {
   );
 
   const createdSettlements = allSettlements
-    .filter(s => s.createdBy === memberId)
+    .filter(s => userRole === 'admin' || s.createdBy === memberId)
     .sort((a, b) => new Date(b.createdAt?.toDate?.() ?? b.createdAt).getTime() - new Date(a.createdAt?.toDate?.() ?? a.createdAt).getTime());
 
   // ===== Create form helpers =====

@@ -248,7 +248,7 @@ export default function EventsPage() {
                   </div>
                   <span className="text-white/20 group-hover:text-blue-400 transition-colors text-sm">→</span>
                 </Link>
-                {userRole === 'admin' && (!event.createdBy || event.createdBy === memberId) && (
+                {(userRole === 'admin' || !event.createdBy || event.createdBy === memberId) && (
                   <button onClick={e => handleDelete(e, event.id, event.title)}
                     className="absolute top-1/2 -translate-y-1/2 right-10 opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all text-xs px-2 py-1">
                     削除
