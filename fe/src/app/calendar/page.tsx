@@ -86,10 +86,18 @@ export default function CalendarPage() {
       const eventItems: CalendarItem[] = events.map(ev => {
         const loc = ev.location || ev.meetingLocation || '';
         const title = loc ? `${ev.title} / ${loc}` : ev.title;
+        // 複数日イベント: FullCalendarのend日付はexclusiveなので翌日を渡す
+        let end: string | undefined;
+        if (ev.endDate && ev.endDate !== ev.date) {
+          const d = new Date(ev.endDate);
+          d.setDate(d.getDate() + 1);
+          end = d.toISOString().split('T')[0];
+        }
         return {
           id: `ev-${ev.id}`,
           title,
           start: ev.date,
+          end,
           type: 'event',
           url: `/events/${ev.id}`,
           color: EVENT_COLOR,
