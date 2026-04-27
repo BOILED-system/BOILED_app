@@ -222,9 +222,11 @@ export default function PracticesPage() {
             </button>
           ) : (
             <>
-              <Link href="/numbers" className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
-                名簿管理
-              </Link>
+              {userRole === 'admin' && (
+                <Link href="/numbers" className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
+                  名簿管理
+                </Link>
+              )}
               {userRole === 'admin' && (
                 <button onClick={() => { setSelectMode(true); setShowForm(false); }}
                   className="text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors">
