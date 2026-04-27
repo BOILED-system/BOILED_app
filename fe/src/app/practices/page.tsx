@@ -174,6 +174,22 @@ export default function PracticesPage() {
     return acc;
   }, {} as Record<string, PracticeSession[]>);
 
+  const todayJST = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date());
+  const sortedGroups = Object.entries(groupedSessions).map(([name, gs]) => {
+    const upcoming = gs.filter(s => s.date >= todayJST);
+    const nearestDate = upcoming.length > 0
+      ? upcoming.reduce((min, s) => s.date < min ? s.date : min, upcoming[0].date)
+      : null;
+    const isPast = upcoming.length === 0;
+    return { name, gs, nearestDate, isPast };
+  }).sort((a, b) => {
+    if (a.isPast !== b.isPast) return a.isPast ? 1 : -1;
+    if (!a.isPast && !b.isPast) return a.nearestDate! <= b.nearestDate! ? -1 : 1;
+    const aLatest = a.gs[a.gs.length - 1].date;
+    const bLatest = b.gs[b.gs.length - 1].date;
+    return aLatest >= bLatest ? -1 : 1;
+  });
+
   if (loading) return <div className="flex justify-center py-20"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"/></div>;
 
   // Compute primary target set for smart dropdown filtering
@@ -410,10 +426,10 @@ export default function PracticesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(groupedSessions).map(([groupName, groupSessions]) => {
+          {sortedGroups.map(({ name: groupName, gs: groupSessions, isPast }) => {
             const isSelected = selectedNames.has(groupName);
             const cardContent = (
-              <div className={`w-full flex flex-col justify-between p-5 min-h-[110px] ${isSelected ? 'bg-red-500/10' : ''}`}>
+              <div className={`w-full flex flex-col justify-between p-5 min-h-[110px] ${isSelected ? 'bg-red-500/10' : ''} ${isPast ? 'opacity-40' : ''}`}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     {selectMode && (
