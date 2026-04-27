@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   getPracticeSessions,
   createPracticeSession,
+  deletePracticeSession,
   getNumberRosters,
   getAllUsers,
   getUser,
@@ -45,6 +46,9 @@ export default function PracticesPage() {
   const [numberRosters, setNumberRosters] = useState<NumberRoster[]>([]);
   const [allUsers, setAllUsers] = useState<FEUser[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 個別指定・追加・除外（ドロップダウンで選択するので name も保持）
   const [targetMembers, setTargetMembers] = useState<{ id: string; name: string }[]>([]);
@@ -139,6 +143,31 @@ export default function PracticesPage() {
     setForm(f => ({ ...f, excludedMemberIds: f.excludedMemberIds.filter(x => x !== id) }));
   };
 
+  const toggleSelect = (name: string) => {
+    setSelectedNames(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNames.size === 0) return;
+    if (!confirm(`選択した ${selectedNames.size} 件のプロジェクトをすべて削除しますか？この操作は取り消せません。`)) return;
+    setIsDeleting(true);
+    try {
+      const toDelete = sessions.filter(s => selectedNames.has(s.name));
+      await Promise.all(toDelete.map(s => deletePracticeSession(s.id)));
+      setSelectMode(false);
+      setSelectedNames(new Set());
+      load(memberId);
+    } catch (e: any) {
+      alert(`削除に失敗しました: ${e?.message || e}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const groupedSessions = sessions.reduce((acc, session) => {
     if (!acc[session.name]) acc[session.name] = [];
     acc[session.name].push(session);
@@ -170,12 +199,25 @@ export default function PracticesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-white">練習</h1>
         <div className="flex gap-2">
-          <Link href="/numbers" className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
-            名簿管理
-          </Link>
-          <button onClick={() => setShowForm(!showForm)} className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors font-bold shadow-lg shadow-blue-500/20">
-            + プロジェクトを追加
-          </button>
+          {selectMode ? (
+            <button onClick={() => { setSelectMode(false); setSelectedNames(new Set()); }}
+              className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
+              キャンセル
+            </button>
+          ) : (
+            <>
+              <Link href="/numbers" className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors">
+                名簿管理
+              </Link>
+              <button onClick={() => { setSelectMode(true); setShowForm(false); }}
+                className="text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors">
+                選択・削除
+              </button>
+              <button onClick={() => setShowForm(!showForm)} className="text-xs px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors font-bold shadow-lg shadow-blue-500/20">
+                + プロジェクトを追加
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -357,6 +399,10 @@ export default function PracticesPage() {
         </div>
       )}
 
+      {selectMode && (
+        <p className="text-xs text-white/40">削除したいプロジェクトをタップして選択してください</p>
+      )}
+
       {sessions.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-white/30 text-sm">練習プロジェクトがまだありません</p>
@@ -364,23 +410,52 @@ export default function PracticesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(groupedSessions).map(([groupName, groupSessions]) => (
-            <Link key={groupName} href={`/practices/project/${encodeURIComponent(groupName)}`} className="block bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden hover:bg-white/[0.08] hover:border-white/[0.2] transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-black/20">
-              <div className="w-full flex flex-col justify-between p-5 min-h-[110px]">
+          {Object.entries(groupedSessions).map(([groupName, groupSessions]) => {
+            const isSelected = selectedNames.has(groupName);
+            const cardContent = (
+              <div className={`w-full flex flex-col justify-between p-5 min-h-[110px] ${isSelected ? 'bg-red-500/10' : ''}`}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
+                    {selectMode && (
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-red-500 border-red-500' : 'border-white/30'}`}>
+                        {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+                      </div>
+                    )}
                     {groupSessions.some(s => s.type === 'event') ? <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">イベント練</span> : groupSessions.some(s => s.type === 'team') ? <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full">チーム練</span> : <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">正規練</span>}
                     <span className="text-xs font-bold text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded-full">{groupSessions.length}件の日程</span>
                   </div>
                   <h3 className="text-lg font-bold text-white truncate">{groupName}</h3>
                 </div>
-                <div className="mt-4 flex items-center justify-between text-white/30 text-xs font-medium border-t border-white/[0.04] pt-3">
-                  <span>タップして全日程を表示</span>
-                  <span className="text-lg">➔</span>
-                </div>
+                {!selectMode && (
+                  <div className="mt-4 flex items-center justify-between text-white/30 text-xs font-medium border-t border-white/[0.04] pt-3">
+                    <span>タップして全日程を表示</span>
+                    <span className="text-lg">➔</span>
+                  </div>
+                )}
               </div>
-            </Link>
-          ))}
+            );
+
+            return selectMode ? (
+              <button key={groupName} onClick={() => toggleSelect(groupName)}
+                className={`block w-full text-left bg-white/[0.04] border rounded-xl overflow-hidden transition-all shadow-lg shadow-black/20 ${isSelected ? 'border-red-500/50' : 'border-white/[0.08] hover:bg-white/[0.08]'}`}>
+                {cardContent}
+              </button>
+            ) : (
+              <Link key={groupName} href={`/practices/project/${encodeURIComponent(groupName)}`}
+                className="block bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden hover:bg-white/[0.08] hover:border-white/[0.2] transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-black/20">
+                {cardContent}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {selectMode && selectedNames.size > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 flex justify-center px-4 z-40">
+          <button onClick={handleBulkDelete} disabled={isDeleting}
+            className="w-full max-w-sm py-3.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-2xl shadow-red-500/30 transition-colors">
+            {isDeleting ? '削除中...' : `${selectedNames.size} 件のプロジェクトを削除`}
+          </button>
         </div>
       )}
     </div>

@@ -369,7 +369,11 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                     <h2 className="text-base font-bold text-white">
                       {session.date} <span className="text-white/60 text-sm ml-2">{session.startTime}{session.endTime ? `〜${session.endTime}` : ''}</span>
                     </h2>
-                    {session.location && <p className="text-xs text-white/30 mt-1">{session.location}</p>}
+                    {session.location && (
+                      <p className="text-sm font-semibold text-white/80 mt-1 bg-white/[0.06] inline-block px-2 py-0.5 rounded-md">
+                        {session.location}
+                      </p>
+                    )}
                   </div>
                   {(!session.createdBy || session.createdBy === memberId) && (
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
