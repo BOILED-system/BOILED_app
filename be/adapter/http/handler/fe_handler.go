@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/noa/circle-app/api/adapter/http/dto"
@@ -70,6 +72,41 @@ func (h *FEHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, users)
+}
+
+// CreateUser handles POST /api/users
+func (h *FEHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req dto.CreateUserFERequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	memberID := strings.TrimSpace(req.MemberID)
+	name := strings.TrimSpace(req.Name)
+	if memberID == "" || name == "" {
+		writeError(w, http.StatusBadRequest, "memberId and name are required")
+		return
+	}
+	role := req.Role
+	if role != "admin" && role != "member" {
+		role = "member"
+	}
+	u := &domain.FEUser{
+		MemberID:   memberID,
+		Name:       name,
+		Role:       role,
+		Genre:      strings.TrimSpace(req.Genre),
+		Generation: req.Generation,
+	}
+	if err := h.interactor.CreateUser(r.Context(), u); err != nil {
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			writeError(w, http.StatusConflict, "member already exists")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, u)
 }
 
 // ===== Practice Sessions =====

@@ -8,4 +8,5 @@ var (
 	ErrNotAuthorized = errors.New("not authorized")
 	ErrForbidden     = errors.New("forbidden: not a target user")
 	ErrInvalidInput  = errors.New("invalid input")
+	ErrAlreadyExists = errors.New("already exists")
 )

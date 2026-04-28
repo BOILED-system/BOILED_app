@@ -57,6 +57,15 @@ func (i *FEInteractor) GetAllUsers(ctx context.Context) ([]*domain.FEUser, error
 	return i.userRepo.GetAll(ctx)
 }
 
+func (i *FEInteractor) CreateUser(ctx context.Context, u *domain.FEUser) error {
+	existing, _ := i.userRepo.GetByMemberID(ctx, u.MemberID)
+	if existing != nil {
+		return domain.ErrAlreadyExists
+	}
+	u.UpdatedAt = time.Now()
+	return i.userRepo.Save(ctx, u)
+}
+
 // ===== Practice Sessions =====
 
 func (i *FEInteractor) GetPracticeSessions(ctx context.Context) ([]*domain.FEPracticeSession, error) {

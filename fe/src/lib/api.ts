@@ -92,6 +92,16 @@ export async function getAllUsers(): Promise<FEUser[]> {
   return apiGet<FEUser[]>('/api/users');
 }
 
+export async function createUser(data: {
+  memberId: string;
+  name: string;
+  role: 'admin' | 'member';
+  genre: string;
+  generation: number;
+}): Promise<FEUser> {
+  return apiPost<FEUser>('/api/users', data);
+}
+
 // ===== Practice Sessions =====
 
 export async function getPracticeSessions(): Promise<PracticeSession[]> {
