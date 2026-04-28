@@ -272,7 +272,7 @@ export default function ProfilePage() {
           onClick={() => setShowAddMember(true)}
           className="w-full bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 rounded-xl py-3 text-sm font-bold transition-colors"
         >
-          ＋ 会員を追加
+          会員を管理
         </button>
       )}
 
