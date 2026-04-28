@@ -12,6 +12,7 @@ import {
 import type { PracticeSession, Settlement } from "@/lib/api";
 
 const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
+const REASON_REQUIRED = new Set(['NO', 'LATE', 'EARLY']);
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 
 export default function ProfilePage() {
@@ -26,6 +27,11 @@ export default function ProfilePage() {
   const [unregistered, setUnregistered] = useState<PracticeSession[]>([]);
   const [unpaidSettlements, setUnpaidSettlements] = useState<Settlement[]>([]);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [reasonModal, setReasonModal] = useState<{
+    session: PracticeSession;
+    status: 'NO' | 'LATE' | 'EARLY';
+  } | null>(null);
+  const [reasonText, setReasonText] = useState('');
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMember, setNewMember] = useState({
     memberId: '',
@@ -50,7 +56,6 @@ export default function ProfilePage() {
       setUser(u as any);
       setLoading(false);
 
-      // 非同期で通知データを並行取得
       Promise.all([
         getUpcomingUnregisteredSessions(memberId),
         getMyUnpaidSettlements(memberId),
@@ -71,7 +76,6 @@ export default function ProfilePage() {
     }
     const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'member'; error?: string }[] = [];
     lines.forEach((line, i) => {
-      // ヘッダー行をスキップ
       if (i === 0 && /会員番号|memberId/i.test(line)) return;
       const cols = line.split(',').map(c => c.trim());
       if (cols.length < 4) {
@@ -152,7 +156,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleRSVP = async (session: PracticeSession, status: 'GO' | 'NO' | 'LATE' | 'EARLY') => {
+  const handleRSVP = async (session: PracticeSession, status: 'GO' | 'NO' | 'LATE' | 'EARLY', note = '') => {
     if (!user || !memberId) return;
     setSubmitting(session.id);
     try {
@@ -163,7 +167,7 @@ export default function ProfilePage() {
         genre: (user as any).genre,
         generation: (user as any).generation,
         status,
-        note: '',
+        note,
       });
       setUnregistered(prev => prev.filter(s => s.id !== session.id));
     } catch (e) {
@@ -172,6 +176,22 @@ export default function ProfilePage() {
     } finally {
       setSubmitting(null);
     }
+  };
+
+  const handleStatusClick = (session: PracticeSession, status: 'GO' | 'NO' | 'LATE' | 'EARLY') => {
+    if (REASON_REQUIRED.has(status)) {
+      setReasonModal({ session, status: status as 'NO' | 'LATE' | 'EARLY' });
+      setReasonText('');
+    } else {
+      handleRSVP(session, status);
+    }
+  };
+
+  const handleReasonSubmit = async () => {
+    if (!reasonModal || !reasonText.trim()) return;
+    await handleRSVP(reasonModal.session, reasonModal.status, reasonText.trim());
+    setReasonModal(null);
+    setReasonText('');
   };
 
   if (loading) {
@@ -243,7 +263,7 @@ export default function ProfilePage() {
                   {(['GO', 'NO', 'LATE', 'EARLY'] as const).map(s => (
                     <button key={s}
                       disabled={submitting === session.id}
-                      onClick={() => handleRSVP(session, s)}
+                      onClick={() => handleStatusClick(session, s)}
                       className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors disabled:opacity-40 ${
                         s === 'GO'    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30' :
                         s === 'NO'    ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30' :
@@ -418,6 +438,43 @@ export default function ProfilePage() {
                 className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
               >
                 {addingMember ? '追加中…' : addMode === 'single' ? '追加' : '一括追加'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 理由入力モーダル */}
+      {reasonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <div>
+              <p className="text-xs font-medium text-yellow-400 uppercase tracking-wide">
+                {STATUS_LABELS[reasonModal.status]}の理由
+              </p>
+              <p className="text-sm font-bold text-white mt-1">{reasonModal.session.name}</p>
+            </div>
+            <textarea
+              autoFocus
+              rows={3}
+              placeholder="理由を入力してください"
+              value={reasonText}
+              onChange={e => setReasonText(e.target.value)}
+              className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 resize-none focus:outline-none focus:border-white/20"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setReasonModal(null); setReasonText(''); }}
+                className="flex-1 py-2.5 text-sm font-bold rounded-xl border border-white/10 text-white/50 hover:bg-white/[0.04] transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleReasonSubmit}
+                disabled={!reasonText.trim() || submitting === reasonModal.session.id}
+                className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {submitting === reasonModal.session.id ? '送信中…' : '送信'}
               </button>
             </div>
           </div>
