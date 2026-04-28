@@ -8,8 +8,10 @@ import {
   getMyUnpaidSettlements,
   submitRSVP,
   createUser,
+  deleteUser,
+  getAllUsers,
 } from "@/lib/api";
-import type { PracticeSession, Settlement } from "@/lib/api";
+import type { FEUser, PracticeSession, Settlement } from "@/lib/api";
 
 const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
 const REASON_REQUIRED = new Set(['NO', 'LATE', 'EARLY']);
@@ -42,9 +44,14 @@ export default function ProfilePage() {
   });
   const [addingMember, setAddingMember] = useState(false);
   const [addMemberError, setAddMemberError] = useState('');
-  const [addMode, setAddMode] = useState<'single' | 'bulk'>('single');
+  const [addMode, setAddMode] = useState<'single' | 'bulk' | 'delete'>('single');
   const [bulkText, setBulkText] = useState('');
   const [bulkResults, setBulkResults] = useState<{ row: number; memberId: string; name: string; ok: boolean; error?: string }[]>([]);
+  const [allMembers, setAllMembers] = useState<FEUser[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<FEUser | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const memberId = localStorage.getItem("memberId");
@@ -66,6 +73,38 @@ export default function ProfilePage() {
     }).catch(() => setLoading(false));
   }, []);
 
+  const openDeleteTab = async () => {
+    setAddMode('delete');
+    setAddMemberError('');
+    try {
+      const users = await getAllUsers();
+      setAllMembers(users);
+    } catch {
+      setAddMemberError('メンバー一覧の取得に失敗しました');
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!deleteTarget) return;
+    if (deleteConfirmText.trim() !== deleteTarget.name) {
+      setAddMemberError('名前が一致しません');
+      return;
+    }
+    setDeleting(true);
+    setAddMemberError('');
+    try {
+      await deleteUser(deleteTarget.memberId);
+      setAllMembers(prev => prev.filter(m => m.memberId !== deleteTarget.memberId));
+      setDeleteTarget(null);
+      setDeleteConfirmText('');
+      alert(`${deleteTarget.name} さんを削除しました`);
+    } catch {
+      setAddMemberError('削除に失敗しました');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleBulkAdd = async () => {
     setAddMemberError('');
     setBulkResults([]);
@@ -77,7 +116,8 @@ export default function ProfilePage() {
     const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'member'; error?: string }[] = [];
     lines.forEach((line, i) => {
       if (i === 0 && /会員番号|memberId/i.test(line)) return;
-      const cols = line.split(',').map(c => c.trim());
+      const sep = line.includes('\t') ? '\t' : ',';
+      const cols = line.split(sep).map(c => c.trim());
       if (cols.length < 4) {
         parsed.push({ row: i + 1, memberId: '', name: '', generation: 0, genre: '', role: 'member', error: '列数が足りません（4列以上必要）' });
         return;
@@ -327,9 +367,15 @@ export default function ProfilePage() {
               >
                 一括追加
               </button>
+              <button
+                onClick={openDeleteTab}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-colors ${addMode === 'delete' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'}`}
+              >
+                削除
+              </button>
             </div>
 
-            {addMode === 'single' ? (
+            {addMode === 'single' && (
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-white/50 block mb-1">会員番号</label>
@@ -384,11 +430,12 @@ export default function ProfilePage() {
                   </select>
                 </div>
               </div>
-            ) : (
+            )}
+            {addMode === 'bulk' && (
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-white/50 mb-2">
-                    1行に1人。CSV形式で <span className="text-white/70">会員番号,名前,代,ジャンル,役割</span> の順に入力。役割は省略可（デフォルトmember）。
+                    1行に1人。スプレッドシートからそのままコピペ可。列の順番は <span className="text-white/70">会員番号・名前・代・ジャンル・役割</span>。役割は省略可（デフォルトmember）。
                   </p>
                   <p className="text-[10px] text-white/40 mb-2">
                     ジャンル: {GENRES.join('/')}
@@ -422,22 +469,121 @@ export default function ProfilePage() {
                 )}
               </div>
             )}
+            {addMode === 'delete' && (
+              <div className="space-y-3">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[11px] text-red-300">
+                  ⚠ 削除すると会員情報・出欠記録・支払い記録・名簿登録がすべて消えます。元に戻せません。
+                </div>
+                <input
+                  type="text"
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  placeholder="名前または会員番号で検索"
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+                <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg max-h-72 overflow-y-auto">
+                  {allMembers
+                    .filter(m => {
+                      const q = memberSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return m.name.toLowerCase().includes(q) || m.memberId.toLowerCase().includes(q);
+                    })
+                    .sort((a, b) => (b.generation ?? 0) - (a.generation ?? 0) || a.name.localeCompare(b.name))
+                    .map(m => (
+                      <div key={m.memberId} className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/5 last:border-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-white/90 truncate">{m.name}</p>
+                          <p className="text-[10px] text-white/40">
+                            {m.memberId} · {m.generation}代 {m.genre}
+                            {m.role === 'admin' && <span className="ml-1 text-amber-400">admin</span>}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { setDeleteTarget(m); setDeleteConfirmText(''); setAddMemberError(''); }}
+                          disabled={m.memberId === memberId}
+                          className="text-xs font-bold text-red-400 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1"
+                        >
+                          {m.memberId === memberId ? '自分' : '削除'}
+                        </button>
+                      </div>
+                    ))}
+                  {allMembers.length === 0 && (
+                    <p className="text-xs text-white/40 text-center py-4">読み込み中…</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {addMemberError && <p className="text-red-400 text-xs">{addMemberError}</p>}
             <div className="flex gap-2 pt-2">
               <button
-                onClick={() => { setShowAddMember(false); setAddMemberError(''); setBulkResults([]); setBulkText(''); }}
+                onClick={() => { setShowAddMember(false); setAddMemberError(''); setBulkResults([]); setBulkText(''); setMemberSearch(''); }}
                 disabled={addingMember}
                 className="flex-1 py-2.5 text-sm font-bold rounded-xl border border-white/10 text-white/50 hover:bg-white/[0.04] transition-colors disabled:opacity-40"
               >
-                {bulkResults.length > 0 ? '閉じる' : 'キャンセル'}
+                {bulkResults.length > 0 ? '閉じる' : addMode === 'delete' ? '閉じる' : 'キャンセル'}
+              </button>
+              {addMode !== 'delete' && (
+                <button
+                  onClick={addMode === 'single' ? handleAddMember : handleBulkAdd}
+                  disabled={addingMember}
+                  className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                >
+                  {addingMember ? '追加中…' : addMode === 'single' ? '追加' : '一括追加'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 会員削除 確認モーダル */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4">
+          <div className="bg-gray-900 border border-red-500/30 rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <div>
+              <p className="text-xs font-medium text-red-400 uppercase tracking-wide">会員を削除</p>
+              <p className="text-sm font-bold text-white mt-1">{deleteTarget.name}</p>
+              <p className="text-[11px] text-white/50 mt-0.5">
+                {deleteTarget.memberId} · {deleteTarget.generation}代 {deleteTarget.genre}
+              </p>
+            </div>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-[11px] text-red-300 space-y-1">
+              <p>以下が完全に削除されます（取り消し不可）:</p>
+              <ul className="list-disc list-inside text-red-300/80">
+                <li>会員情報</li>
+                <li>すべての出欠登録</li>
+                <li>すべての支払い記録</li>
+                <li>名簿への登録</li>
+              </ul>
+            </div>
+            <div>
+              <label className="text-xs text-white/60 block mb-1">
+                確認のため <span className="text-white font-bold">{deleteTarget.name}</span> と入力してください
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/40"
+              />
+            </div>
+            {addMemberError && <p className="text-red-400 text-xs">{addMemberError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setDeleteTarget(null); setDeleteConfirmText(''); setAddMemberError(''); }}
+                disabled={deleting}
+                className="flex-1 py-2.5 text-sm font-bold rounded-xl border border-white/10 text-white/60 hover:bg-white/[0.04] disabled:opacity-40"
+              >
+                キャンセル
               </button>
               <button
-                onClick={addMode === 'single' ? handleAddMember : handleBulkAdd}
-                disabled={addingMember}
-                className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                onClick={handleDeleteMember}
+                disabled={deleting || deleteConfirmText.trim() !== deleteTarget.name}
+                className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {addingMember ? '追加中…' : addMode === 'single' ? '追加' : '一括追加'}
+                {deleting ? '削除中…' : '完全に削除'}
               </button>
             </div>
           </div>

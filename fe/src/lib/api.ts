@@ -102,6 +102,10 @@ export async function createUser(data: {
   return apiPost<FEUser>('/api/users', data);
 }
 
+export async function deleteUser(memberId: string): Promise<void> {
+  return apiDelete(`/api/users/${memberId}`);
+}
+
 // ===== Practice Sessions =====
 
 export async function getPracticeSessions(): Promise<PracticeSession[]> {
