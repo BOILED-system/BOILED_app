@@ -27,6 +27,7 @@ func SetupFE(mux *http.ServeMux, feHandler *handler.FEHandler) {
 
 	// Users
 	mux.HandleFunc("GET /api/users", feHandler.GetAllUsers)
+	mux.HandleFunc("POST /api/users", feHandler.CreateUser)
 	mux.HandleFunc("GET /api/users/{memberId}", feHandler.GetUser)
 
 	// Practice Sessions

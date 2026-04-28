@@ -7,10 +7,12 @@ import {
   getUpcomingUnregisteredSessions,
   getMyUnpaidSettlements,
   submitRSVP,
+  createUser,
 } from "@/lib/api";
 import type { PracticeSession, Settlement } from "@/lib/api";
 
 const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
+const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 
 export default function ProfilePage() {
   const [user, setUser] = useState<{
@@ -24,6 +26,16 @@ export default function ProfilePage() {
   const [unregistered, setUnregistered] = useState<PracticeSession[]>([]);
   const [unpaidSettlements, setUnpaidSettlements] = useState<Settlement[]>([]);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMember, setNewMember] = useState({
+    memberId: '',
+    name: '',
+    genre: GENRES[0],
+    generation: '',
+    role: 'member' as 'admin' | 'member',
+  });
+  const [addingMember, setAddingMember] = useState(false);
+  const [addMemberError, setAddMemberError] = useState('');
 
   useEffect(() => {
     const memberId = localStorage.getItem("memberId");
@@ -45,6 +57,43 @@ export default function ProfilePage() {
       }).catch(console.error);
     }).catch(() => setLoading(false));
   }, []);
+
+  const handleAddMember = async () => {
+    setAddMemberError('');
+    const memberId = newMember.memberId.trim();
+    const name = newMember.name.trim();
+    const generation = parseInt(newMember.generation, 10);
+    if (!memberId || !name) {
+      setAddMemberError('会員番号と名前は必須です');
+      return;
+    }
+    if (!Number.isFinite(generation) || generation <= 0) {
+      setAddMemberError('代数は正の数で入力してください');
+      return;
+    }
+    setAddingMember(true);
+    try {
+      await createUser({
+        memberId,
+        name,
+        role: newMember.role,
+        genre: newMember.genre,
+        generation,
+      });
+      setShowAddMember(false);
+      setNewMember({ memberId: '', name: '', genre: GENRES[0], generation: '', role: 'member' });
+      alert(`${name} さんを追加しました`);
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (msg.includes('409')) {
+        setAddMemberError('その会員番号は既に登録されています');
+      } else {
+        setAddMemberError('追加に失敗しました');
+      }
+    } finally {
+      setAddingMember(false);
+    }
+  };
 
   const handleRSVP = async (session: PracticeSession, status: 'GO' | 'NO' | 'LATE' | 'EARLY') => {
     if (!user || !memberId) return;
@@ -99,6 +148,16 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Admin: 会員追加 */}
+      {user?.role === "admin" && (
+        <button
+          onClick={() => setShowAddMember(true)}
+          className="w-full bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 rounded-xl py-3 text-sm font-bold transition-colors"
+        >
+          ＋ 会員を追加
+        </button>
+      )}
 
       {/* 通知エリア */}
       <div className="space-y-3">
@@ -170,6 +229,86 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* 会員追加モーダル */}
+      {showAddMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base font-bold text-white">会員を追加</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-white/50 block mb-1">会員番号</label>
+                <input
+                  type="text"
+                  value={newMember.memberId}
+                  onChange={e => setNewMember({ ...newMember, memberId: e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) })}
+                  placeholder="例：16199"
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 block mb-1">名前</label>
+                <input
+                  type="text"
+                  value={newMember.name}
+                  onChange={e => setNewMember({ ...newMember, name: e.target.value })}
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/50 block mb-1">代</label>
+                  <input
+                    type="number"
+                    value={newMember.generation}
+                    onChange={e => setNewMember({ ...newMember, generation: e.target.value })}
+                    placeholder="例：53"
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 block mb-1">ジャンル</label>
+                  <select
+                    value={newMember.genre}
+                    onChange={e => setNewMember({ ...newMember, genre: e.target.value })}
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+                  >
+                    {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-white/50 block mb-1">役割</label>
+                <select
+                  value={newMember.role}
+                  onChange={e => setNewMember({ ...newMember, role: e.target.value as 'admin' | 'member' })}
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+                >
+                  <option value="member">member</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+            </div>
+            {addMemberError && <p className="text-red-400 text-xs">{addMemberError}</p>}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => { setShowAddMember(false); setAddMemberError(''); }}
+                disabled={addingMember}
+                className="flex-1 py-2.5 text-sm font-bold rounded-xl border border-white/10 text-white/50 hover:bg-white/[0.04] transition-colors disabled:opacity-40"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleAddMember}
+                disabled={addingMember}
+                className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+              >
+                {addingMember ? '追加中…' : '追加'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

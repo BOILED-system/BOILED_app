@@ -3,6 +3,16 @@ package dto
 
 import "github.com/noa/circle-app/api/domain"
 
+// ===== Users =====
+
+type CreateUserFERequest struct {
+	MemberID   string `json:"memberId"`
+	Name       string `json:"name"`
+	Role       string `json:"role"`
+	Genre      string `json:"genre"`
+	Generation int    `json:"generation"`
+}
+
 // ===== Practice Sessions =====
 
 type CreatePracticeSessionFERequest struct {
