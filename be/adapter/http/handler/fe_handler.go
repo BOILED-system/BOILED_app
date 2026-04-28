@@ -74,6 +74,20 @@ func (h *FEHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, users)
 }
 
+// DeleteUser handles DELETE /api/users/{memberId}
+func (h *FEHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	memberID := r.PathValue("memberId")
+	if err := h.interactor.DeleteUser(r.Context(), memberID); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // CreateUser handles POST /api/users
 func (h *FEHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateUserFERequest

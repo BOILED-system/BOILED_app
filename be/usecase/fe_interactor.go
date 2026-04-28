@@ -66,6 +66,23 @@ func (i *FEInteractor) CreateUser(ctx context.Context, u *domain.FEUser) error {
 	return i.userRepo.Save(ctx, u)
 }
 
+// DeleteUser removes a user and all related records (RSVPs, payments, roster memberships).
+func (i *FEInteractor) DeleteUser(ctx context.Context, memberID string) error {
+	if _, err := i.userRepo.GetByMemberID(ctx, memberID); err != nil {
+		return domain.ErrNotFound
+	}
+	if err := i.rsvpRepo.DeleteByMember(ctx, memberID); err != nil {
+		return err
+	}
+	if err := i.paymentRepo.DeleteByMember(ctx, memberID); err != nil {
+		return err
+	}
+	if err := i.rosterRepo.RemoveMemberFromAll(ctx, memberID); err != nil {
+		return err
+	}
+	return i.userRepo.Delete(ctx, memberID)
+}
+
 // ===== Practice Sessions =====
 
 func (i *FEInteractor) GetPracticeSessions(ctx context.Context) ([]*domain.FEPracticeSession, error) {

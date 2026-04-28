@@ -44,3 +44,30 @@ func (r *fePaymentRepository) Update(ctx context.Context, settlementID, memberID
 	_, err := ref.Set(ctx, data, firestore.MergeAll)
 	return err
 }
+
+func (r *fePaymentRepository) DeleteByMember(ctx context.Context, memberID string) error {
+	settlementDocs, err := r.client.Collection(feSettlementCollection).Documents(ctx).GetAll()
+	if err != nil {
+		return err
+	}
+	batch := r.client.Batch()
+	count := 0
+	for _, sd := range settlementDocs {
+		ref := r.client.Collection(feSettlementCollection).Doc(sd.Ref.ID).Collection("payments").Doc(memberID)
+		batch.Delete(ref)
+		count++
+		if count >= 400 {
+			if _, err := batch.Commit(ctx); err != nil {
+				return err
+			}
+			batch = r.client.Batch()
+			count = 0
+		}
+	}
+	if count > 0 {
+		if _, err := batch.Commit(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}

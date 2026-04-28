@@ -50,3 +50,8 @@ func (r *feUserRepository) Save(ctx context.Context, u *domain.FEUser) error {
 	_, err := r.client.Collection(feUserCollection).Doc(u.MemberID).Set(ctx, u, firestore.MergeAll)
 	return err
 }
+
+func (r *feUserRepository) Delete(ctx context.Context, memberID string) error {
+	_, err := r.client.Collection(feUserCollection).Doc(memberID).Delete(ctx)
+	return err
+}

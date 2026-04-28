@@ -51,6 +51,34 @@ func (r *fePracticeRSVPRepository) GetBySession(ctx context.Context, sessionID s
 	return rsvps, nil
 }
 
+func (r *fePracticeRSVPRepository) DeleteByMember(ctx context.Context, memberID string) error {
+	sessionDocs, err := r.client.Collection(fePracticeSessionCollection).Documents(ctx).GetAll()
+	if err != nil {
+		return err
+	}
+	batch := r.client.Batch()
+	count := 0
+	for _, sd := range sessionDocs {
+		ref := r.client.Collection(fePracticeSessionCollection).Doc(sd.Ref.ID).Collection("rsvps").Doc(memberID)
+		batch.Delete(ref)
+		count++
+		// Firestore batch limit is 500
+		if count >= 400 {
+			if _, err := batch.Commit(ctx); err != nil {
+				return err
+			}
+			batch = r.client.Batch()
+			count = 0
+		}
+	}
+	if count > 0 {
+		if _, err := batch.Commit(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *fePracticeRSVPRepository) GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error) {
 	sessionDocs, err := r.client.Collection(fePracticeSessionCollection).Documents(ctx).GetAll()
 	if err != nil {

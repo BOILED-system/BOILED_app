@@ -53,6 +53,14 @@ func (r *cachedFEUserRepo) Save(ctx context.Context, u *domain.FEUser) error {
 	return nil
 }
 
+func (r *cachedFEUserRepo) Delete(ctx context.Context, memberID string) error {
+	if err := r.inner.Delete(ctx, memberID); err != nil {
+		return err
+	}
+	r.store.Delete("users:all", fmt.Sprintf("users:id:%s", memberID))
+	return nil
+}
+
 // ===== FEPracticeSessionRepository =====
 
 type cachedFEPracticeSessionRepo struct {
@@ -176,6 +184,14 @@ func (r *cachedFEPracticeRSVPRepo) Upsert(ctx context.Context, sessionID string,
 	return nil
 }
 
+func (r *cachedFEPracticeRSVPRepo) DeleteByMember(ctx context.Context, memberID string) error {
+	if err := r.inner.DeleteByMember(ctx, memberID); err != nil {
+		return err
+	}
+	r.store.Clear()
+	return nil
+}
+
 // ===== NumberRosterRepository =====
 
 type cachedNumberRosterRepo struct {
@@ -218,6 +234,14 @@ func (r *cachedNumberRosterRepo) Update(ctx context.Context, id string, data map
 
 func (r *cachedNumberRosterRepo) Delete(ctx context.Context, id string) error {
 	if err := r.inner.Delete(ctx, id); err != nil {
+		return err
+	}
+	r.store.Delete("rosters:all")
+	return nil
+}
+
+func (r *cachedNumberRosterRepo) RemoveMemberFromAll(ctx context.Context, memberID string) error {
+	if err := r.inner.RemoveMemberFromAll(ctx, memberID); err != nil {
 		return err
 	}
 	r.store.Delete("rosters:all")
@@ -383,5 +407,13 @@ func (r *cachedFEPaymentRepo) Update(ctx context.Context, settlementID, memberID
 		return err
 	}
 	r.store.Delete(fmt.Sprintf("payments:settlement:%s", settlementID))
+	return nil
+}
+
+func (r *cachedFEPaymentRepo) DeleteByMember(ctx context.Context, memberID string) error {
+	if err := r.inner.DeleteByMember(ctx, memberID); err != nil {
+		return err
+	}
+	r.store.Clear()
 	return nil
 }

@@ -51,6 +51,13 @@ func (s *Store) Delete(keys ...string) {
 	s.mu.Unlock()
 }
 
+// Clear removes all entries.
+func (s *Store) Clear() {
+	s.mu.Lock()
+	s.items = make(map[string]entry)
+	s.mu.Unlock()
+}
+
 // evictLoop cleans up expired entries every minute.
 func (s *Store) evictLoop() {
 	t := time.NewTicker(time.Minute)

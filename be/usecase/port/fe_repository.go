@@ -12,6 +12,7 @@ type FEUserRepository interface {
 	GetByMemberID(ctx context.Context, memberID string) (*domain.FEUser, error)
 	GetAll(ctx context.Context) ([]*domain.FEUser, error)
 	Save(ctx context.Context, u *domain.FEUser) error
+	Delete(ctx context.Context, memberID string) error
 }
 
 // FEPracticeSessionRepository defines practice session data access using FE schema.
@@ -29,6 +30,7 @@ type FEPracticeRSVPRepository interface {
 	GetBySessionAndMember(ctx context.Context, sessionID, memberID string) (*domain.FEPracticeRSVP, error)
 	GetBySession(ctx context.Context, sessionID string) ([]*domain.FEPracticeRSVP, error)
 	GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPracticeRSVP, error)
+	DeleteByMember(ctx context.Context, memberID string) error
 }
 
 // NumberRosterRepository defines number roster data access.
@@ -37,6 +39,7 @@ type NumberRosterRepository interface {
 	GetAll(ctx context.Context) ([]*domain.NumberRoster, error)
 	Update(ctx context.Context, id string, data map[string]interface{}) error
 	Delete(ctx context.Context, id string) error
+	RemoveMemberFromAll(ctx context.Context, memberID string) error
 }
 
 // FEEventRepository defines event data access using FE schema.
@@ -62,6 +65,7 @@ type FEPaymentRepository interface {
 	Create(ctx context.Context, settlementID string, p *domain.FEPaymentRecord) error
 	GetBySettlement(ctx context.Context, settlementID string) ([]*domain.FEPaymentRecord, error)
 	Update(ctx context.Context, settlementID, memberID string, data map[string]interface{}) error
+	DeleteByMember(ctx context.Context, memberID string) error
 }
 
 // FELineMessageRepository defines LINE message data access.

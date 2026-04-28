@@ -52,3 +52,35 @@ func (r *numberRosterRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.client.Collection(numberRosterCollection).Doc(id).Delete(ctx)
 	return err
 }
+
+func (r *numberRosterRepository) RemoveMemberFromAll(ctx context.Context, memberID string) error {
+	docs, err := r.client.Collection(numberRosterCollection).Documents(ctx).GetAll()
+	if err != nil {
+		return err
+	}
+	for _, doc := range docs {
+		var nr domain.NumberRoster
+		if err := doc.DataTo(&nr); err != nil {
+			continue
+		}
+		filtered := make([]string, 0, len(nr.MemberIDs))
+		removed := false
+		for _, id := range nr.MemberIDs {
+			if id == memberID {
+				removed = true
+				continue
+			}
+			filtered = append(filtered, id)
+		}
+		if !removed {
+			continue
+		}
+		if _, err := doc.Ref.Set(ctx, map[string]interface{}{
+			"memberIds": filtered,
+			"updatedAt": time.Now(),
+		}, firestore.MergeAll); err != nil {
+			return err
+		}
+	}
+	return nil
+}
