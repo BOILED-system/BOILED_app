@@ -123,13 +123,13 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
       <div className="bg-[#141824] border border-white/[0.08] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-white/80 whitespace-nowrap">
-            <thead className="bg-white/[0.04] text-xs uppercase text-white/50 border-b border-white/[0.08]">
+            <thead className="text-xs uppercase text-white/50">
               <tr>
-                <th className="px-4 py-3 font-medium bg-[#1a1f2e] sticky left-0 z-10 w-20">会員番号</th>
-                <th className="px-4 py-3 font-medium bg-[#1a1f2e] border-r border-white/[0.04] sticky left-[80px] z-10 min-w-[120px]">名前</th>
-                <th className="px-4 py-3 font-medium">ジャンル</th>
+                <th className="px-4 py-3 font-medium bg-[#1a2030] sticky left-0 top-0 z-30 w-20 border-b border-white/[0.08]">会員番号</th>
+                <th className="px-4 py-3 font-medium bg-[#1a2030] border-r border-white/[0.04] sticky left-[80px] top-0 z-30 min-w-[120px] border-b border-white/[0.08]">名前</th>
+                <th className="px-4 py-3 font-medium bg-[#1a2030] sticky top-0 z-10 border-b border-white/[0.08]">ジャンル</th>
                 {sessions.map(s => (
-                  <th key={s.id} className="px-4 py-3 font-medium text-center border-l border-white/[0.04]">
+                  <th key={s.id} className="px-4 py-3 font-medium text-center border-l border-white/[0.04] bg-[#1a2030] sticky top-0 z-10 border-b border-white/[0.08]">
                     <div>{s.date.split('-').slice(1).join('/')}</div>
                     <div className="text-[10px] text-white/30">{s.startTime}</div>
                   </th>
