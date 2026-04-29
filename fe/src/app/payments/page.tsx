@@ -157,7 +157,7 @@ export default function PaymentsPage() {
   );
 
   const createdSettlements = allSettlements
-    .filter(s => userRole === 'admin' || s.createdBy === memberId)
+    .filter(s => s.createdBy === memberId)
     .sort((a, b) => new Date(b.createdAt?.toDate?.() ?? b.createdAt).getTime() - new Date(a.createdAt?.toDate?.() ?? a.createdAt).getTime());
 
   // ===== Create form helpers =====
