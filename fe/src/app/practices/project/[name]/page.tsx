@@ -118,7 +118,14 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   };
 
   const handleBulkRSVPChange = (sessionId: string, status: string, note: string) => {
-    setEditingRSVPs(prev => ({ ...prev, [sessionId]: { status, note } }));
+    setEditingRSVPs(prev => {
+      if (prev[sessionId]?.status === status) {
+        const next = { ...prev };
+        delete next[sessionId];
+        return next;
+      }
+      return { ...prev, [sessionId]: { status, note } };
+    });
   };
 
   const saveBulkRSVPs = async () => {
