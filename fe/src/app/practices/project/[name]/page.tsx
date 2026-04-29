@@ -120,17 +120,19 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const handleBulkRSVPChange = (sessionId: string, status: string, note: string) => {
     setEditingRSVPs(prev => {
       if (prev[sessionId]?.status === status) {
-        // 同じ未保存の選択を再クリック → 取り消し
         const next = { ...prev };
         delete next[sessionId];
         return next;
       }
-      // 保存済みと同じ状態かつ未編集なら何もしない
       if (!prev[sessionId] && myRSVPs[sessionId]?.status === status) {
         return prev;
       }
       return { ...prev, [sessionId]: { status, note } };
     });
+  };
+
+  const handleNoteChange = (sessionId: string, status: string, note: string) => {
+    setEditingRSVPs(prev => ({ ...prev, [sessionId]: { status, note } }));
   };
 
   const saveBulkRSVPs = async () => {
@@ -420,7 +422,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                   </div>
                   {(status === 'LATE' || status === 'EARLY' || status === 'NO') && (
                     <input type="text" placeholder="理由（任意）" value={note}
-                      onChange={e => handleBulkRSVPChange(session.id, status, e.target.value)}
+                      onChange={e => handleNoteChange(session.id, status, e.target.value)}
                       className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
                   )}
                 </div>
