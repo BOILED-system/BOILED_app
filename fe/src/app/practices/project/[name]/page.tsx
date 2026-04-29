@@ -120,9 +120,14 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const handleBulkRSVPChange = (sessionId: string, status: string, note: string) => {
     setEditingRSVPs(prev => {
       if (prev[sessionId]?.status === status) {
+        // 同じ未保存の選択を再クリック → 取り消し
         const next = { ...prev };
         delete next[sessionId];
         return next;
+      }
+      // 保存済みと同じ状態かつ未編集なら何もしない
+      if (!prev[sessionId] && myRSVPs[sessionId]?.status === status) {
+        return prev;
       }
       return { ...prev, [sessionId]: { status, note } };
     });
