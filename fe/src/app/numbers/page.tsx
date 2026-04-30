@@ -65,19 +65,24 @@ export default function NumbersPage() {
   };
 
   const handleAddMember = async (rosterId: string, currentIds: string[]) => {
-    const id = memberInput.trim();
+    const id = memberInput.trim().replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
     if (!id) return;
     if (currentIds.includes(id)) { setMemberInputError('すでに追加されています'); return; }
     setMemberInputLoading(true);
     setMemberInputError('');
-    const user = await getUser(id);
-    setMemberInputLoading(false);
-    if (!user) { setMemberInputError('会員番号が見つかりません'); return; }
-    const newIds = [...currentIds, id];
-    await updateNumberRoster(rosterId, { memberIds: newIds });
-    setMemberNames(prev => ({ ...prev, [id]: user.name as string }));
-    setMemberInput('');
-    setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
+    try {
+      const user = await getUser(id);
+      if (!user) { setMemberInputError('会員番号が見つかりません'); return; }
+      const newIds = [...currentIds, id];
+      await updateNumberRoster(rosterId, { memberIds: newIds });
+      setMemberNames(prev => ({ ...prev, [id]: user.name as string }));
+      setMemberInput('');
+      setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
+    } catch (e: any) {
+      setMemberInputError(`登録に失敗しました: ${e?.message || e}`);
+    } finally {
+      setMemberInputLoading(false);
+    }
   };
 
   const handleRemoveMember = async (rosterId: string, currentIds: string[], removeId: string) => {
@@ -121,16 +126,21 @@ export default function NumbersPage() {
     const toAdd = csvPreview.filter(p => p.found && !currentIds.includes(p.id));
     if (toAdd.length === 0) { alert('追加できる新しいメンバーがいません'); return; }
     setCsvImporting(true);
-    const newIds = [...currentIds, ...toAdd.map(p => p.id)];
-    await updateNumberRoster(rosterId, { memberIds: newIds });
-    const newNames: Record<string, string> = {};
-    toAdd.forEach(p => { newNames[p.id] = p.name; });
-    setMemberNames(prev => ({ ...prev, ...newNames }));
-    setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
-    setCsvMode(null);
-    setCsvText('');
-    setCsvPreview([]);
-    setCsvImporting(false);
+    try {
+      const newIds = [...currentIds, ...toAdd.map(p => p.id)];
+      await updateNumberRoster(rosterId, { memberIds: newIds });
+      const newNames: Record<string, string> = {};
+      toAdd.forEach(p => { newNames[p.id] = p.name; });
+      setMemberNames(prev => ({ ...prev, ...newNames }));
+      setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
+      setCsvMode(null);
+      setCsvText('');
+      setCsvPreview([]);
+    } catch (e: any) {
+      alert(`登録に失敗しました: ${e?.message || e}`);
+    } finally {
+      setCsvImporting(false);
+    }
   };
 
   const openCsvMode = (rosterId: string) => {
