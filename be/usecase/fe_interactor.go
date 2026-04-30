@@ -105,35 +105,28 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 	return i.sessionRepo.Delete(ctx, id)
 }
 
-// SyncPracticesFromSheet は date+name をキーに upsert する。
-// 既存セッションは startTime/endTime/location を上書き更新し、新規は作成する。
+// SyncPracticesFromSheet は date+name をキーに重複チェックし、新規のみ作成する。
+// アプリ側で編集済みのセッションは上書きしない。
 // 戻り値は作成件数。
 func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
 	existing, err := i.sessionRepo.GetAll(ctx)
 	if err != nil {
 		return 0, err
 	}
-	existingMap := make(map[string]*domain.FEPracticeSession, len(existing))
+	existingMap := make(map[string]struct{}, len(existing))
 	for _, s := range existing {
-		existingMap[s.Date+"_"+s.Name] = s
+		existingMap[s.Date+"_"+s.Name] = struct{}{}
 	}
 
 	created := 0
 	for _, s := range sessions {
-		if ex, dup := existingMap[s.Date+"_"+s.Name]; dup {
-			if err := i.sessionRepo.Update(ctx, ex.ID, map[string]interface{}{
-				"startTime": s.StartTime,
-				"endTime":   s.EndTime,
-				"location":  s.Location,
-			}); err != nil {
-				return created, err
-			}
-		} else {
-			if err := i.sessionRepo.Create(ctx, s); err != nil {
-				return created, err
-			}
-			created++
+		if _, dup := existingMap[s.Date+"_"+s.Name]; dup {
+			continue
 		}
+		if err := i.sessionRepo.Create(ctx, s); err != nil {
+			return created, err
+		}
+		created++
 	}
 	return created, nil
 }
