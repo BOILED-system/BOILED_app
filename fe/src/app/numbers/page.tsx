@@ -139,6 +139,24 @@ export default function NumbersPage() {
     setCsvPreview([]);
   };
 
+  const handlePasteMember = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    rosterId: string,
+  ) => {
+    const text = e.clipboardData.getData('text');
+    const ids = Array.from(new Set(
+      text.split(/[\n\r]/)
+        .flatMap(line => line.split(/[\t,\s]+/))
+        .map(t => t.trim())
+        .filter(t => /^\d{4,6}$/.test(t))
+    ));
+    if (ids.length <= 1) return; // 1件以下は通常入力に任せる
+    e.preventDefault();
+    setCsvMode(rosterId);
+    setCsvText(text);
+    parseCsvText(text);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -260,10 +278,11 @@ export default function NumbersPage() {
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            placeholder="会員番号を入力（例：16199）"
+                            placeholder="会員番号（1件 or 複数行ペースト可）"
                             value={memberInput}
                             onChange={e => { setMemberInput(e.target.value); setMemberInputError(''); }}
                             onKeyDown={e => e.key === 'Enter' && handleAddMember(roster.id, roster.memberIds)}
+                            onPaste={e => handlePasteMember(e, roster.id)}
                             className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none"
                           />
                           <button
