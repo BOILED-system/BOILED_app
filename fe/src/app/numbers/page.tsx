@@ -101,7 +101,7 @@ export default function NumbersPage() {
     // タブ・カンマ・改行で分割してトークンを取得
     const tokens = text
       .split(/[\n\r]/)
-      .flatMap(line => line.split(/[\t,]/))
+      .flatMap(line => line.split(/[\t,\s]+/))
       .map(t => t.trim().replace(/^["']|["']$/g, '')) // クォート除去
       .filter(t => /^\d{4,6}$/.test(t)); // 4〜6桁の数字のみ（会員番号）
 
