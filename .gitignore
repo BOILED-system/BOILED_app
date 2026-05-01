@@ -1,0 +1,9 @@
+# ローカル開発用の環境変数ファイル
+be/.env.local
+fe/.env.local
+
+# Firestore Emulator のローカル永続データ
+firebase-data/
+
+# OS
+.DS_Store
