@@ -18,7 +18,7 @@ import type { PracticeSession, NumberRoster, TargetType, FEUser } from '@/lib/ap
 import MemberSelectDropdown from '@/components/MemberSelectDropdown';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
-const GENERATIONS = [16, 17];
+const GENERATIONS = [16, 17, 18];
 const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
 const STATUS_COLORS: Record<string, string> = {
   GO: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',

@@ -15,7 +15,7 @@ import type { PracticeSession, NumberRoster, TargetType, FEUser } from '@/lib/ap
 import MemberSelectDropdown from '@/components/MemberSelectDropdown';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
-const GENERATIONS = [16, 17];
+const GENERATIONS = [16, 17, 18];
 const addTwoHours = (time: string): string => {
   if (!time) return '';
   const [h, m] = time.split(':').map(Number);
