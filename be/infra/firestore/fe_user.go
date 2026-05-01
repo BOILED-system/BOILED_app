@@ -47,7 +47,7 @@ func (r *feUserRepository) GetAll(ctx context.Context) ([]*domain.FEUser, error)
 }
 
 func (r *feUserRepository) Save(ctx context.Context, u *domain.FEUser) error {
-	_, err := r.client.Collection(feUserCollection).Doc(u.MemberID).Set(ctx, u, firestore.MergeAll)
+	_, err := r.client.Collection(feUserCollection).Doc(u.MemberID).Set(ctx, u)
 	return err
 }
 
