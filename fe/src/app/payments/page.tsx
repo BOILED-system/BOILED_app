@@ -27,7 +27,7 @@ import type {
 import MemberSelectDropdown from '@/components/MemberSelectDropdown';
 
 const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
-const GENERATIONS = [16, 17];
+const GENERATIONS = [16, 17, 18];
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   bank: '振込',
