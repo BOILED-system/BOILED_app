@@ -144,7 +144,12 @@ export default function AttendancePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-white">{projectFilter ? projectFilter : '出欠'}</h1>
+        {projectFilter && (
+          <Link href={`/practices/project/${encodeURIComponent(projectFilter)}`} className="text-xs text-white/30 hover:text-white/60 transition-colors">
+            ← {projectFilter}
+          </Link>
+        )}
+        <h1 className="text-xl font-bold text-white mt-1">{projectFilter ? projectFilter : '出欠'}</h1>
         {projectFilter && <p className="text-xs text-white/30 mt-0.5">自分の出欠履歴</p>}
       </div>
 
