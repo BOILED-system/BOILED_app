@@ -162,7 +162,7 @@ export default function AttendancePage() {
                   <div className="flex items-start justify-between gap-3">
                     {/* セッション情報 */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1.5">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                           session.type === 'event'
                             ? 'bg-orange-500/20 text-orange-300'
@@ -174,11 +174,12 @@ export default function AttendancePage() {
                           <span className="text-[10px] text-white/20">終了</span>
                         )}
                       </div>
-                      <h3 className="text-sm font-medium text-white">{session.name}</h3>
-                      <p className="text-xs text-white/40 mt-0.5">
-                        {session.date} {session.startTime}
-                        {session.location && ` · ${session.location}`}
+                      <p className="text-base font-bold text-white">
+                        {session.date}
+                        <span className="text-sm font-normal text-white/70 ml-2">{session.startTime}</span>
+                        {session.location && <span className="text-sm font-normal text-white/50"> · {session.location}</span>}
                       </p>
+                      <h3 className="text-xs text-white/40 mt-0.5">{session.name}</h3>
                     </div>
 
                     {/* Member: 自分のRSVP */}

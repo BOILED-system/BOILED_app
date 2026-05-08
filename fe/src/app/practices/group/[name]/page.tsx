@@ -173,6 +173,30 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
                 </tr>
               )}
             </tbody>
+            {users.length > 0 && (
+              <tfoot className="border-t-2 border-white/[0.12] text-[10px]">
+                <tr className="bg-[#1a2030]">
+                  <td className="px-4 py-2 text-white/30 bg-[#1a2030] sticky left-0 z-10" colSpan={3}>合計 / 未提出</td>
+                  {sessions.map(s => {
+                    const sessionRsvps = Object.values(rsvps[s.id] ?? {});
+                    const go   = sessionRsvps.filter(r => r.status === 'GO').length;
+                    const no   = sessionRsvps.filter(r => r.status === 'NO').length;
+                    const late = sessionRsvps.filter(r => r.status === 'LATE').length;
+                    const early= sessionRsvps.filter(r => r.status === 'EARLY').length;
+                    const unsubmitted = users.length - (go + no + late + early);
+                    return (
+                      <td key={s.id} className="px-2 py-2 text-center border-l border-white/[0.04] leading-relaxed">
+                        {go > 0    && <div className="text-emerald-400">出 {go}</div>}
+                        {no > 0    && <div className="text-red-400">欠 {no}</div>}
+                        {late > 0  && <div className="text-yellow-400">遅 {late}</div>}
+                        {early > 0 && <div className="text-orange-400">早 {early}</div>}
+                        {unsubmitted > 0 && <div className="text-white/25">未 {unsubmitted}</div>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
