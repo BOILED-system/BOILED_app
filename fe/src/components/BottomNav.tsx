@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 const navItems = [
     { href: '/profile', label: 'ホーム' },
     { href: '/practices', label: '出欠登録' },
-    { href: '/attendance', label: '履歴' },
     { href: '/events', label: 'イベント' },
     { href: '/calendar', label: 'カレンダー' },
     { href: '/payments', label: '精算' },
