@@ -28,6 +28,7 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
   const [users, setUsers] = useState<FEUser[]>([]);
   const [rsvps, setRsvps] = useState<Record<string, Record<string, PracticeRSVP>>>({});
   const [loading, setLoading] = useState(true);
+  const [noteModal, setNoteModal] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -148,9 +149,17 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
                     if (!rsvp) return <td key={s.id} className="px-4 py-2 text-center text-white/20 border-l border-white/[0.04] text-xs">-</td>;
                     
                     return (
-                      <td key={s.id} className="px-4 py-2 text-center border-l border-white/[0.04]">
+                      <td
+                        key={s.id}
+                        className={`px-4 py-2 text-center border-l border-white/[0.04] ${rsvp.note ? 'cursor-pointer hover:bg-white/[0.04] transition-colors' : ''}`}
+                        onClick={rsvp.note ? () => setNoteModal(rsvp.note) : undefined}
+                      >
                         <div className={`font-bold \${STATUS_COLORS[rsvp.status]}`}>{STATUS_SHORT[rsvp.status]}</div>
-                        {rsvp.note && <div className="text-[9px] text-white/40 mt-0.5 truncate max-w-[60px]" title={rsvp.note}>{rsvp.note}</div>}
+                        {rsvp.note && (
+                          <div className="text-[9px] text-white/40 mt-0.5 truncate max-w-[60px]">
+                            {rsvp.note}
+                          </div>
+                        )}
                       </td>
                     );
                   })}
@@ -167,6 +176,27 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
           </table>
         </div>
       </div>
+
+      {noteModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setNoteModal(null)}
+        >
+          <div
+            className="bg-[#1a2030] border border-white/[0.12] rounded-xl p-5 max-w-sm w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-[10px] text-white/40 mb-2 uppercase tracking-wider">理由</p>
+            <p className="text-sm text-white/80 leading-relaxed">{noteModal}</p>
+            <button
+              className="mt-4 w-full text-xs text-white/40 py-2 border border-white/[0.08] rounded-lg hover:bg-white/[0.04] transition-colors"
+              onClick={() => setNoteModal(null)}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

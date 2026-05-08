@@ -40,6 +40,7 @@ export default function AttendancePage() {
   const [userRole, setUserRole] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [noteModal, setNoteModal] = useState<string | null>(null);
 
   useEffect(() => {
     const mid = localStorage.getItem('memberId') || '';
@@ -282,7 +283,12 @@ export default function AttendancePage() {
                               {rsvp.generation ? `${rsvp.generation}代` : ''} {rsvp.genre}
                             </span>
                             {rsvp.note && (
-                              <p className="text-[10px] text-white/25 mt-0.5">{rsvp.note}</p>
+                              <button
+                                className="block text-left text-[10px] text-white/40 mt-0.5 max-w-[180px] truncate hover:text-white/70 transition-colors"
+                                onClick={() => setNoteModal(rsvp.note)}
+                              >
+                                {rsvp.note}
+                              </button>
                             )}
                           </div>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[rsvp.status]}`}>
@@ -295,6 +301,26 @@ export default function AttendancePage() {
               </div>
             );
           })}
+        </div>
+      )}
+      {noteModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setNoteModal(null)}
+        >
+          <div
+            className="bg-[#1a2030] border border-white/[0.12] rounded-xl p-5 max-w-sm w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-[10px] text-white/40 mb-2 uppercase tracking-wider">理由</p>
+            <p className="text-sm text-white/80 leading-relaxed">{noteModal}</p>
+            <button
+              className="mt-4 w-full text-xs text-white/40 py-2 border border-white/[0.08] rounded-lg hover:bg-white/[0.04] transition-colors"
+              onClick={() => setNoteModal(null)}
+            >
+              閉じる
+            </button>
+          </div>
         </div>
       )}
     </div>
