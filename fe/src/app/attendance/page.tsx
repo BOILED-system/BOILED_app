@@ -236,39 +236,34 @@ export default function AttendancePage() {
                     )}
                   </div>
 
-                  {/* 詳細リンク */}
-                  <div className="mt-2.5 flex items-center justify-between">
-                    {userRole === 'admin' && myRSVP && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[myRSVP.status]}`}>
-                        自分: {STATUS_LABELS[myRSVP.status]}
-                      </span>
-                    )}
-                    {userRole === 'admin' && !myRSVP && isUpcoming && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handleQuickRSVP(session.id, 'GO')}
-                          disabled={saving === session.id}
-                          className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded hover:bg-emerald-500/30 disabled:opacity-40 transition-colors"
-                        >
-                          出席
-                        </button>
-                        <button
-                          onClick={() => handleQuickRSVP(session.id, 'NO')}
-                          disabled={saving === session.id}
-                          className="text-[10px] px-2 py-0.5 bg-white/[0.06] text-white/30 rounded hover:bg-white/[0.08] disabled:opacity-40 transition-colors"
-                        >
-                          欠席
-                        </button>
-                      </div>
-                    )}
-                    {(!myRSVP || !isUpcoming) && <span />}
-                    <Link
-                      href={`/practices/${session.id}`}
-                      className="text-[11px] text-white/20 hover:text-blue-400 transition-colors"
-                    >
-                      詳細・変更 →
-                    </Link>
-                  </div>
+                  {/* 管理者向け自分のRSVP表示・クイック登録 */}
+                  {userRole === 'admin' && (
+                    <div className="mt-2.5">
+                      {myRSVP && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[myRSVP.status]}`}>
+                          自分: {STATUS_LABELS[myRSVP.status]}
+                        </span>
+                      )}
+                      {!myRSVP && isUpcoming && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleQuickRSVP(session.id, 'GO')}
+                            disabled={saving === session.id}
+                            className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded hover:bg-emerald-500/30 disabled:opacity-40 transition-colors"
+                          >
+                            出席
+                          </button>
+                          <button
+                            onClick={() => handleQuickRSVP(session.id, 'NO')}
+                            disabled={saving === session.id}
+                            className="text-[10px] px-2 py-0.5 bg-white/[0.06] text-white/30 rounded hover:bg-white/[0.08] disabled:opacity-40 transition-colors"
+                          >
+                            欠席
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Admin: 展開時の全員一覧 */}
