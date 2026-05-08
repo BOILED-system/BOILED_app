@@ -380,7 +380,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
             <Link href={`/practices/group/${encodeURIComponent(groupName)}`} className="text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-3 py-2 rounded-lg transition-colors border border-emerald-500/30 font-bold whitespace-nowrap">
               📋 出欠一覧・CSV出力
             </Link>
-            <Link href="/attendance" className="text-xs text-white/30 hover:text-white/60 transition-colors whitespace-nowrap">
+            <Link href={`/attendance?project=${encodeURIComponent(groupName)}`} className="text-xs text-white/30 hover:text-white/60 transition-colors whitespace-nowrap">
               自分の出欠履歴 →
             </Link>
           </div>

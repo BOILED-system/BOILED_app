@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   getPracticeSessions,
   getMyRSVPs,
@@ -34,6 +35,9 @@ interface SessionRow {
 }
 
 export default function AttendancePage() {
+  const searchParams = useSearchParams();
+  const projectFilter = searchParams.get('project');
+
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [memberId, setMemberId] = useState('');
@@ -59,7 +63,9 @@ export default function AttendancePage() {
       ]);
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
-      const sessions = allSessions.filter(s => isSessionForMember(s, mid, genre, generation, rosters));
+      const sessions = allSessions
+        .filter(s => isSessionForMember(s, mid, genre, generation, rosters))
+        .filter(s => !projectFilter || s.name === projectFilter);
       const today = new Date().toISOString().split('T')[0];
       const upcoming = sessions
         .filter(s => s.date >= today)
@@ -137,7 +143,10 @@ export default function AttendancePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <h1 className="text-xl font-bold text-white">出欠</h1>
+      <div>
+        <h1 className="text-xl font-bold text-white">{projectFilter ? projectFilter : '出欠'}</h1>
+        {projectFilter && <p className="text-xs text-white/30 mt-0.5">自分の出欠履歴</p>}
+      </div>
 
       {rows.length === 0 ? (
         <div className="text-center py-16">
