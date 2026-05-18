@@ -55,6 +55,7 @@ export default function AttendancePage() {
   }, []);
 
   const load = async (mid: string, role: string) => {
+    const isAdmin = role === 'admin' || role === 'genre_admin';
     try {
       const [allSessions, rosters, user] = await Promise.all([
         getPracticeSessions(),
@@ -64,7 +65,7 @@ export default function AttendancePage() {
       const genre = user?.genre || '';
       const generation = user?.generation || 0;
       const sessions = allSessions
-        .filter(s => isSessionForMember(s, mid, genre, generation, rosters))
+        .filter(s => role === 'genre_admin' || isSessionForMember(s, mid, genre, generation, rosters))
         .filter(s => !projectFilter || s.name === projectFilter);
       const today = new Date().toISOString().split('T')[0];
       const upcoming = sessions
@@ -79,7 +80,7 @@ export default function AttendancePage() {
       const result = await Promise.all(
         sorted.map(async session => {
           const myRSVP = myRSVPsMap[session.id] ?? null;
-          const allRSVPs = role === 'admin' ? await getSessionRSVPs(session.id) : [];
+          const allRSVPs = isAdmin ? await getSessionRSVPs(session.id) : [];
           return { session, myRSVP, allRSVPs };
         })
       );
@@ -120,7 +121,7 @@ export default function AttendancePage() {
           ? {
               ...row,
               myRSVP: newRSVP,
-              allRSVPs: userRole === 'admin'
+              allRSVPs: (userRole === 'admin' || userRole === 'genre_admin')
                 ? [...row.allRSVPs.filter(r => r.memberId !== memberId), newRSVP]
                 : row.allRSVPs,
             }
@@ -229,7 +230,7 @@ export default function AttendancePage() {
                     )}
 
                     {/* Admin: 集計バッジ */}
-                    {userRole === 'admin' && (
+                    {(userRole === 'admin' || userRole === 'genre_admin') && (
                       <div className="flex-shrink-0 flex items-center gap-2">
                         <div className="flex gap-1.5 text-[10px]">
                           {goCount > 0 && <span className="text-emerald-400">出 {goCount}</span>}
@@ -251,7 +252,7 @@ export default function AttendancePage() {
                   </div>
 
                   {/* 管理者向け自分のRSVP表示・クイック登録 */}
-                  {userRole === 'admin' && (
+                  {(userRole === 'admin' || userRole === 'genre_admin') && (
                     <div className="mt-2.5">
                       {myRSVP && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[myRSVP.status]}`}>
@@ -281,7 +282,7 @@ export default function AttendancePage() {
                 </div>
 
                 {/* Admin: 展開時の全員一覧 */}
-                {userRole === 'admin' && isExpanded && allRSVPs.length > 0 && (
+                {(userRole === 'admin' || userRole === 'genre_admin') && isExpanded && allRSVPs.length > 0 && (
                   <div className="border-t border-white/[0.06] divide-y divide-white/[0.04]">
                     {allRSVPs
                       .sort((a, b) => a.name.localeCompare(b.name, 'ja'))

@@ -194,6 +194,7 @@ function buildExpectedEvents() {
       if (!dateRaw) continue;
 
       const baseDate = new Date(dateRaw);
+      if (isNaN(baseDate.getTime())) continue;
 
       for (const genre of GENRE_COLUMNS) {
         const cellValue = normalizeCell(String(row[genre.index]));
@@ -201,11 +202,32 @@ function buildExpectedEvents() {
 
         const eventDate = extractDateFromCell(cellValue, baseDate) || baseDate;
         const timeMatch = cellValue.match(/([\d]+(?:[:\.][\d]+)?)\s*-\s*([\d]+(?:[:\.][\d]+)?)/);
-        if (!timeMatch) continue;
 
-        const timeIndex  = cellValue.indexOf(timeMatch[0]);
+        // 時間なしの場合：期間が空 or 人名・メモとみなされるセルはスキップ
+        if (!timeMatch) {
+          if (!category) continue;
+          const knownLocation = getLocation(normalizeStudioName(cellValue.trim()));
+          if (!knownLocation && !/[a-zA-Z0-9]/.test(cellValue)) continue;
+        }
+
+        let startDate = null, endDate = null;
+        if (timeMatch) {
+          const startTime = parseTime(timeMatch[1]);
+          const endTime   = parseTime(timeMatch[2]);
+          startDate = new Date(eventDate);
+          startDate.setHours(startTime.hours, startTime.minutes, 0, 0);
+          endDate = new Date(eventDate);
+          endDate.setHours(endTime.hours, endTime.minutes, 0, 0);
+          if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1);
+          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            console.log(`日付無効のためスキップ: "${cellValue}" (baseDate: ${baseDate})`);
+            continue;
+          }
+        }
+
+        const timeIndex  = timeMatch ? cellValue.indexOf(timeMatch[0]) : cellValue.length;
         const beforeTime = cellValue.slice(0, timeIndex).trim();
-        const afterTime  = cellValue.slice(timeIndex + timeMatch[0].length).trim();
+        const afterTime  = timeMatch ? cellValue.slice(timeIndex + timeMatch[0].length).trim() : '';
 
         const studioRaw = beforeTime
           .replace(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/, '')
@@ -214,24 +236,11 @@ function buildExpectedEvents() {
           .replace(/\d{1,2}日/, '')
           .trim();
 
-        const studioName = normalizeStudioName(studioRaw);
+        const studioName = normalizeStudioName(studioRaw) || '未定';
         const keyMatch   = afterTime.match(/🔑?(\d+)/);
         const keyStr     = keyMatch ? ` 🔑${keyMatch[1]}` : '';
         const nightMark  = isNightPractice ? '🌛深夜練 ' : '';
         const title      = `${nightMark}${category} ${genre.name} ${studioName}${keyStr}`;
-
-        const startTime = parseTime(timeMatch[1]);
-        const endTime   = parseTime(timeMatch[2]);
-
-        const startDate = new Date(eventDate);
-        startDate.setHours(startTime.hours, startTime.minutes, 0, 0);
-        const endDate = new Date(eventDate);
-        endDate.setHours(endTime.hours, endTime.minutes, 0, 0);
-
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          console.log(`日付無効のためスキップ: "${cellValue}" (baseDate: ${baseDate})`);
-          continue;
-        }
 
         const calendarName = GENRE_CALENDAR_MAP[genre.name];
         if (!expected[calendarName]) expected[calendarName] = [];
@@ -239,11 +248,16 @@ function buildExpectedEvents() {
           title,
           startDate,
           endDate,
+          eventDate,
+          hasTime: !!timeMatch,
           location: getLocation(studioName),
+          studioName,
         });
 
-        if (!minDate || startDate < minDate) minDate = new Date(startDate);
-        if (!maxDate || endDate   > maxDate) maxDate = new Date(endDate);
+        if (startDate) {
+          if (!minDate || startDate < minDate) minDate = new Date(startDate);
+          if (!maxDate || endDate   > maxDate) maxDate = new Date(endDate);
+        }
       }
     }
   }
@@ -297,7 +311,7 @@ function syncToCalendar() {
       allEventsMap.get(key).push(ev);
     }
 
-    const futureExpected = expectedList.filter(ev => ev.startDate >= today);
+    const futureExpected = expectedList.filter(ev => ev.hasTime && ev.startDate && ev.startDate >= today);
     const expectedMap = new Map(
       futureExpected.map(ev => [makeEventKey(ev.title, ev.startDate), ev])
     );
@@ -446,28 +460,42 @@ function syncToApp() {
       const type = category.includes('正規練') ? 'regular' : 'event';
       const name = `${category}${genreName}`;
 
-      let sessionDate = ev.startDate;
-      let startHour   = ev.startDate.getHours();
-      let startMin    = ev.startDate.getMinutes();
-      let endHour     = ev.endDate.getHours();
-      let endMin      = ev.endDate.getMinutes();
+      const pad = n => String(n).padStart(2, '0');
+      let dateStr, startTimeStr, endTimeStr;
 
-      if (isNight && startHour < 12) {
-        sessionDate = new Date(ev.startDate);
-        sessionDate.setDate(sessionDate.getDate() - 1);
-        startHour += 24;
-        endHour   += 24;
+      if (ev.hasTime && ev.startDate) {
+        let sessionDate = ev.startDate;
+        let startHour   = ev.startDate.getHours();
+        let startMin    = ev.startDate.getMinutes();
+        let endHour     = ev.endDate.getHours();
+        let endMin      = ev.endDate.getMinutes();
+
+        if (isNight && startHour < 12) {
+          sessionDate = new Date(ev.startDate);
+          sessionDate.setDate(sessionDate.getDate() - 1);
+          startHour += 24;
+          endHour   += 24;
+        }
+
+        const d = sessionDate;
+        dateStr      = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        startTimeStr = `${startHour}:${pad(startMin)}`;
+        endTimeStr   = `${endHour}:${pad(endMin)}`;
+      } else {
+        const d = new Date(ev.eventDate);
+        dateStr      = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        startTimeStr = '未定';
+        endTimeStr   = '未定';
       }
 
-      const pad = n => String(n).padStart(2, '0');
-      const d   = sessionDate;
+      const locationStr = (studioPart || ev.studioName || ev.location || '未定') + (isNight ? '（深夜練）' : '');
 
       sessions.push({
         name,
-        date:         `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-        startTime:    `${startHour}:${pad(startMin)}`,
-        endTime:      `${endHour}:${pad(endMin)}`,
-        location:     (studioPart || ev.location || '場所未定') + (isNight ? '（深夜練）' : ''),
+        date:         dateStr,
+        startTime:    startTimeStr,
+        endTime:      endTimeStr,
+        location:     locationStr,
         type,
         targetGenres: [genreName],
       });
