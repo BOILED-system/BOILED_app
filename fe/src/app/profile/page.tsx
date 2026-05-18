@@ -40,7 +40,7 @@ export default function ProfilePage() {
     name: '',
     genre: GENRES[0],
     generation: '',
-    role: 'member' as 'admin' | 'genre_admin' | 'member',
+    role: 'member' as 'admin' | 'member',
   });
   const [addingMember, setAddingMember] = useState(false);
   const [addMemberError, setAddMemberError] = useState('');
@@ -113,7 +113,7 @@ export default function ProfilePage() {
       setAddMemberError('1行以上入力してください');
       return;
     }
-    const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'genre_admin' | 'member'; error?: string }[] = [];
+    const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'member'; error?: string }[] = [];
     lines.forEach((line, i) => {
       if (i === 0 && /会員番号|memberId/i.test(line)) return;
       const sep = line.includes('\t') ? '\t' : ',';
@@ -136,7 +136,7 @@ export default function ProfilePage() {
         parsed.push({ row: i + 1, memberId, name, generation, genre, role: 'member', error: `ジャンルは ${GENRES.join('/')} のいずれか` });
         return;
       }
-      const role = (['admin', 'genre_admin'].includes(roleStr) ? roleStr : 'member') as 'admin' | 'genre_admin' | 'member';
+      const role = (roleStr === 'admin' ? 'admin' : 'member') as 'admin' | 'member';
       parsed.push({ row: i + 1, memberId, name, generation, genre, role });
     });
 
@@ -422,12 +422,11 @@ export default function ProfilePage() {
                   <label className="text-xs text-white/50 block mb-1">役割</label>
                   <select
                     value={newMember.role}
-                    onChange={e => setNewMember({ ...newMember, role: e.target.value as 'admin' | 'genre_admin' | 'member' })}
+                    onChange={e => setNewMember({ ...newMember, role: e.target.value as 'admin' | 'member' })}
                     className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20"
                   >
                     <option value="member">member</option>
                     <option value="admin">admin</option>
-                    <option value="genre_admin">genre_admin</option>
                   </select>
                 </div>
               </div>

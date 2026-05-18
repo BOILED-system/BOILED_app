@@ -95,7 +95,7 @@ export async function getAllUsers(): Promise<FEUser[]> {
 export async function createUser(data: {
   memberId: string;
   name: string;
-  role: 'admin' | 'genre_admin' | 'member';
+  role: 'admin' | 'member';
   genre: string;
   generation: number;
 }): Promise<FEUser> {
