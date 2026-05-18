@@ -128,7 +128,7 @@ export default function ProfilePage() {
         parsed.push({ row: i + 1, memberId, name, generation: 0, genre: '', role: 'member', error: '会員番号と名前は必須' });
         return;
       }
-      if (!Number.isFinite(generation) || generation <= 0) {
+      if (!Number.isFinite(generation) || generation < 0) {
         parsed.push({ row: i + 1, memberId, name, generation: 0, genre: '', role: 'member', error: '代が不正' });
         return;
       }

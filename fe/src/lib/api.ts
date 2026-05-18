@@ -325,7 +325,7 @@ export function isSessionForMember(
   if (tt === 'genre_generation') {
     if (!session.targetGenres?.length && !session.targetGenerations?.length) return false;
     const genreOk = !session.targetGenres?.length || session.targetGenres.includes(genre);
-    const genOk = !session.targetGenerations?.length || session.targetGenerations.includes(generation);
+    const genOk = generation === 0 || !session.targetGenerations?.length || session.targetGenerations.includes(generation);
     return genreOk && genOk;
   }
   if (tt === 'number') {
