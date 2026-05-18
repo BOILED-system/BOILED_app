@@ -98,6 +98,9 @@ export default function PaymentsPage() {
   const [selectedCollector, setSelectedCollector] = useState<CashCollector | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
 
+  // Expanded payment info on incoming cards
+  const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
+
   // Creator's expanded settlements
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [paymentsCache, setPaymentsCache] = useState<Record<string, PaymentRecord[]>>({});
@@ -794,37 +797,80 @@ export default function PaymentsPage() {
                 <div className="text-center py-12"><p className="text-white/30 text-sm">未払いの請求はありません</p></div>
               ) : unpaidSettlements.map(s => {
                 const isOverdue = new Date(s.dueDate) < new Date();
+                const isPaymentExpanded = expandedPaymentId === s.id;
+                const hasPaymentInfo = !!(s.bankInfo || s.paypayInfo || (s.cashCollectors?.length ?? 0) > 0);
                 return (
-                  <div key={s.id} className={`border rounded-xl p-4 ${isOverdue ? 'bg-red-500/[0.06] border-red-500/20' : 'bg-white/[0.04] border-white/[0.06]'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-medium text-white">{s.title}</h3>
-                          {!(s.requiresConfirmation ?? false) && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400/70 rounded border border-emerald-500/20">確認なし</span>
-                          )}
-                          {(s.requiresConfirmation ?? false) && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-orange-500/10 text-orange-400/70 rounded border border-orange-500/20">要確認</span>
+                  <div key={s.id} className={`border rounded-xl overflow-hidden ${isOverdue ? 'bg-red-500/[0.06] border-red-500/20' : 'bg-white/[0.04] border-white/[0.06]'}`}>
+                    <button
+                      className="w-full p-4 text-left"
+                      onClick={() => hasPaymentInfo && setExpandedPaymentId(isPaymentExpanded ? null : s.id)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-medium text-white">{s.title}</h3>
+                            {!(s.requiresConfirmation ?? false) && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400/70 rounded border border-emerald-500/20">確認なし</span>
+                            )}
+                            {(s.requiresConfirmation ?? false) && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-orange-500/10 text-orange-400/70 rounded border border-orange-500/20">要確認</span>
+                            )}
+                          </div>
+                          <p className={`text-xs mt-1 ${isOverdue ? 'text-red-400' : 'text-white/40'}`}>
+                            {s.createdByName} より・期限 {s.dueDate}{isOverdue ? '（期限超過）' : ''}
+                          </p>
+                          {s.note && <p className="text-xs text-white/30 mt-1">{s.note}</p>}
+                          {s.paymentMethods?.length > 0 && (
+                            <div className="flex gap-1 mt-2 flex-wrap items-center">
+                              {s.paymentMethods.map(m => <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full border ${METHOD_COLORS[m]}`}>{METHOD_LABELS[m]}</span>)}
+                              {hasPaymentInfo && <span className="text-[10px] text-white/20 ml-1">{isPaymentExpanded ? '▲' : '▼'}</span>}
+                            </div>
                           )}
                         </div>
-                        <p className={`text-xs mt-1 ${isOverdue ? 'text-red-400' : 'text-white/40'}`}>
-                          {s.createdByName} より・期限 {s.dueDate}{isOverdue ? '（期限超過）' : ''}
-                        </p>
-                        {s.note && <p className="text-xs text-white/30 mt-1">{s.note}</p>}
-                        {s.paymentMethods?.length > 0 && (
-                          <div className="flex gap-1 mt-2 flex-wrap">
-                            {s.paymentMethods.map(m => <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full border ${METHOD_COLORS[m]}`}>{METHOD_LABELS[m]}</span>)}
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span className="text-base font-bold text-white">¥{s.amount.toLocaleString()}</span>
+                          <button
+                            onClick={e => { e.stopPropagation(); openReportModal(s); }}
+                            className="text-xs px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                          >
+                            支払い報告
+                          </button>
+                        </div>
+                      </div>
+                    </button>
+
+                    {isPaymentExpanded && (
+                      <div className="border-t border-white/[0.06] px-4 py-3 space-y-3">
+                        {s.bankInfo && (
+                          <div>
+                            <p className="text-[11px] text-white/30 mb-1">口座情報</p>
+                            <div className="bg-white/[0.04] rounded-lg p-3 font-mono text-xs text-white/70 whitespace-pre-wrap select-all border border-blue-500/20">
+                              {s.bankInfo}
+                            </div>
+                          </div>
+                        )}
+                        {s.paypayInfo && (
+                          <div>
+                            <p className="text-[11px] text-white/30 mb-1">PayPay 送金先</p>
+                            <div className="bg-white/[0.04] rounded-lg p-3 text-sm text-white/80 select-all border border-red-500/20 font-mono">
+                              {s.paypayInfo}
+                            </div>
+                          </div>
+                        )}
+                        {(s.cashCollectors?.length ?? 0) > 0 && (
+                          <div>
+                            <p className="text-[11px] text-white/30 mb-1">現金の受取担当</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {s.cashCollectors.map(c => (
+                                <span key={c.memberId} className="text-xs bg-emerald-500/10 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                  {c.name}{(c.genre || c.generation) ? ` (${c.genre}${c.generation ? ` ${c.generation}代` : ''})` : ''}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className="text-base font-bold text-white">¥{s.amount.toLocaleString()}</span>
-                        <button onClick={() => openReportModal(s)}
-                          className="text-xs px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors">
-                          支払い報告
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -1151,7 +1197,7 @@ export default function PaymentsPage() {
 
       {/* ===== 支払い報告モーダル ===== */}
       {reportingSettlement && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReportingSettlement(null)} />
           <div className="relative w-full max-w-md bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl">
             <div className="bg-white/[0.04] rounded-xl p-3 text-center">
@@ -1177,26 +1223,6 @@ export default function PaymentsPage() {
                 ))}
               </div>
             </div>
-
-            {selectedMethod === 'bank' && reportingSettlement.bankInfo && (
-              <div>
-                <p className="text-[11px] text-white/30 mb-1">口座情報</p>
-                <div className="bg-white/[0.04] rounded-lg p-3 font-mono text-xs text-white/70 whitespace-pre-wrap select-all border border-blue-500/20">
-                  {reportingSettlement.bankInfo}
-                </div>
-                <p className="text-[10px] text-white/20 mt-1">振り込み後、下のボタンを押してください</p>
-              </div>
-            )}
-
-            {selectedMethod === 'paypay' && reportingSettlement.paypayInfo && (
-              <div>
-                <p className="text-[11px] text-white/30 mb-1">PayPay 送金先</p>
-                <div className="bg-white/[0.04] rounded-lg p-3 text-sm text-white/80 select-all border border-red-500/20 font-mono">
-                  {reportingSettlement.paypayInfo}
-                </div>
-                <p className="text-[10px] text-white/20 mt-1">送金後、下のボタンを押してください</p>
-              </div>
-            )}
 
             {selectedMethod === 'cash' && (
               <div className="space-y-2">
