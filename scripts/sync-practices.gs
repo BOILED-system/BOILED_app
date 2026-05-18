@@ -78,6 +78,13 @@ function makeEventKey(title, date) {
   return `${title}|${y}/${mo}/${d} ${h}:${min}`;
 }
 
+function makeAllDayKey(title, date) {
+  const y  = date.getFullYear();
+  const mo = date.getMonth() + 1;
+  const d  = date.getDate();
+  return `${title}|${y}/${mo}/${d} allday`;
+}
+
 // -----------------------------------------------------------------------
 // 正規化
 // -----------------------------------------------------------------------
@@ -257,6 +264,9 @@ function buildExpectedEvents() {
         if (startDate) {
           if (!minDate || startDate < minDate) minDate = new Date(startDate);
           if (!maxDate || endDate   > maxDate) maxDate = new Date(endDate);
+        } else {
+          if (!minDate || eventDate < minDate) minDate = new Date(eventDate);
+          if (!maxDate || eventDate > maxDate) maxDate = new Date(eventDate);
         }
       }
     }
@@ -306,14 +316,24 @@ function syncToCalendar() {
 
     const allEventsMap = new Map();
     for (const ev of allCalendarEvents) {
-      const key = makeEventKey(ev.getTitle(), ev.getStartTime());
+      const key = ev.isAllDayEvent()
+        ? makeAllDayKey(ev.getTitle(), ev.getStartTime())
+        : makeEventKey(ev.getTitle(), ev.getStartTime());
       if (!allEventsMap.has(key)) allEventsMap.set(key, []);
       allEventsMap.get(key).push(ev);
     }
 
-    const futureExpected = expectedList.filter(ev => ev.hasTime && ev.startDate && ev.startDate >= today);
+    const futureExpected = expectedList.filter(ev => {
+      if (ev.hasTime) return ev.startDate && ev.startDate >= today;
+      return ev.eventDate && ev.eventDate >= today;
+    });
     const expectedMap = new Map(
-      futureExpected.map(ev => [makeEventKey(ev.title, ev.startDate), ev])
+      futureExpected.map(ev => {
+        const key = ev.hasTime
+          ? makeEventKey(ev.title, ev.startDate)
+          : makeAllDayKey(ev.title, ev.eventDate);
+        return [key, ev];
+      })
     );
     const expectedKeys = new Set(expectedMap.keys());
 
@@ -383,7 +403,9 @@ function syncToCalendar() {
           }
         }
 
-        const newEvent = calendar.createEvent(ev.title, ev.startDate, ev.endDate);
+        const newEvent = ev.hasTime
+          ? calendar.createEvent(ev.title, ev.startDate, ev.endDate)
+          : calendar.createAllDayEvent(ev.title, ev.eventDate);
         newEvent.setDescription(SYNC_TAG);
         if (ev.location) newEvent.setLocation(ev.location);
         console.log(`登録: ${ev.title} @ ${key.split('|')[1]}`);
