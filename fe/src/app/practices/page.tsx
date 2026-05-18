@@ -24,7 +24,7 @@ const addTwoHours = (time: string): string => {
 
 const EMPTY_FORM = {
   name: '',
-  schedules: [{ date: '', startTime: '19:00', endTime: '21:00', location: '' }],
+  schedules: [{ date: '', startTime: '19:00', endTime: '21:00', location: '', timeTBD: false }],
   note: '',
   type: 'regular' as 'regular' | 'event' | 'team',
   targetType: 'genre_generation' as TargetType,
@@ -94,14 +94,14 @@ export default function PracticesPage() {
 
   const handleCreate = async () => {
     if (!form.name) { alert('練習名は必須です'); return; }
-    const validSchedules = form.schedules.filter(s => s.date && s.startTime);
+    const validSchedules = form.schedules.filter(s => s.date && (s.startTime || s.timeTBD));
     if (validSchedules.length === 0) { alert('少なくとも1つの有効な日程（日付・開始時間）を追加してください'); return; }
     if (form.targetType === 'number' && !form.targetNumberId) { alert('ナンバー名簿を選択してください'); return; }
     setIsCreating(true);
     const createdBy = memberId;
     const createdByName = localStorage.getItem('userName') || '';
     await Promise.all(validSchedules.map(sch => createPracticeSession({
-      ...form, date: sch.date, startTime: sch.startTime, endTime: sch.endTime, location: sch.location,
+      ...form, date: sch.date, startTime: sch.timeTBD ? '' : sch.startTime, endTime: sch.timeTBD ? '' : sch.endTime, location: sch.location,
       createdBy, createdByName,
     })));
     resetForm();
@@ -278,29 +278,45 @@ export default function PracticesPage() {
                       const next = [...form.schedules]; next[i].date = e.target.value; setForm({ ...form, schedules: next });
                     }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
                   </div>
-                  <div className="w-[80px]">
-                    <input type="time" value={sch.startTime} onChange={e => {
-                      const next = [...form.schedules]; next[i].startTime = e.target.value; next[i].endTime = addTwoHours(e.target.value); setForm({ ...form, schedules: next });
-                    }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
-                  </div>
-                  <span className="text-white/30 pt-2">〜</span>
-                  <div className="w-[80px]">
-                    <input type="time" value={sch.endTime} onChange={e => {
-                      const next = [...form.schedules]; next[i].endTime = e.target.value; setForm({ ...form, schedules: next });
-                    }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
-                  </div>
+                  {sch.timeTBD ? (
+                    <span className="text-xs text-white/30 pt-2.5 flex-shrink-0">時間未定</span>
+                  ) : (
+                    <>
+                      <div className="w-[80px]">
+                        <input type="time" value={sch.startTime} onChange={e => {
+                          const next = [...form.schedules]; next[i].startTime = e.target.value; next[i].endTime = addTwoHours(e.target.value); setForm({ ...form, schedules: next });
+                        }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                      </div>
+                      <span className="text-white/30 pt-2">〜</span>
+                      <div className="w-[80px]">
+                        <input type="time" value={sch.endTime} onChange={e => {
+                          const next = [...form.schedules]; next[i].endTime = e.target.value; setForm({ ...form, schedules: next });
+                        }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-2 text-sm text-white focus:outline-none" />
+                      </div>
+                    </>
+                  )}
                   {form.schedules.length > 1 && (
                     <button onClick={() => setForm({ ...form, schedules: form.schedules.filter((_, idx) => idx !== i) })} className="pt-2 px-1 text-white/20 hover:text-red-400">×</button>
                   )}
                 </div>
-                <div className="w-full">
+                <div className="flex gap-2 w-full items-center">
                   <input type="text" placeholder="場所（例：マイスタ4B） / 任意" value={sch.location} onChange={e => {
                     const next = [...form.schedules]; next[i].location = e.target.value; setForm({ ...form, schedules: next });
-                  }} className="w-full bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500/50" />
+                  }} className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500/50" />
+                  <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <input type="checkbox" checked={sch.timeTBD} onChange={e => {
+                      const next = [...form.schedules];
+                      next[i].timeTBD = e.target.checked;
+                      if (e.target.checked) { next[i].startTime = ''; next[i].endTime = ''; }
+                      else { next[i].startTime = '19:00'; next[i].endTime = '21:00'; }
+                      setForm({ ...form, schedules: next });
+                    }} className="accent-blue-500" />
+                    <span className="text-[11px] text-white/40">時間未定</span>
+                  </label>
                 </div>
               </div>
             ))}
-            <button onClick={() => setForm({ ...form, schedules: [...form.schedules, { date: '', startTime: '19:00', endTime: '21:00', location: '' }] })} className="text-xs font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-2 rounded-lg w-full transition-colors mt-2">
+            <button onClick={() => setForm({ ...form, schedules: [...form.schedules, { date: '', startTime: '19:00', endTime: '21:00', location: '', timeTBD: false }] })} className="text-xs font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-2 rounded-lg w-full transition-colors mt-2">
               + 別の日程枠を追加
             </button>
           </div>
