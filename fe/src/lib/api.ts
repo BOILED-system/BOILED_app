@@ -318,6 +318,7 @@ export function isSessionForMember(
   rosters: NumberRoster[],
 ): boolean {
   if (session.excludedMemberIds?.includes(memberId)) return false;
+  if (genre === 'Admin') return true;
   if (session.additionalMemberIds?.includes(memberId)) return true;
 
   const tt: TargetType = session.targetType || 'genre_generation';

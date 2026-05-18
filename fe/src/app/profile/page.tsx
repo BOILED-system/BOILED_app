@@ -15,7 +15,7 @@ import type { FEUser, PracticeSession, Settlement } from "@/lib/api";
 
 const STATUS_LABELS: Record<string, string> = { GO: '出席', NO: '欠席', LATE: '遅刻', EARLY: '早退' };
 const REASON_REQUIRED = new Set(['NO', 'LATE', 'EARLY']);
-const GENRES = ['Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
+const GENRES = ['Admin', 'Break', 'Girls', 'Hiphop', 'House', 'Lock', 'Pop', 'Waack'];
 
 export default function ProfilePage() {
   const [user, setUser] = useState<{
