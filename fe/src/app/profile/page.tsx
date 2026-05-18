@@ -40,7 +40,7 @@ export default function ProfilePage() {
     name: '',
     genre: GENRES[0],
     generation: '',
-    role: 'member' as 'admin' | 'member',
+    role: 'member' as 'admin' | 'genre_admin' | 'member',
   });
   const [addingMember, setAddingMember] = useState(false);
   const [addMemberError, setAddMemberError] = useState('');
@@ -113,7 +113,7 @@ export default function ProfilePage() {
       setAddMemberError('1行以上入力してください');
       return;
     }
-    const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'member'; error?: string }[] = [];
+    const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'genre_admin' | 'member'; error?: string }[] = [];
     lines.forEach((line, i) => {
       if (i === 0 && /会員番号|memberId/i.test(line)) return;
       const sep = line.includes('\t') ? '\t' : ',';
