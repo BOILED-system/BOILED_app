@@ -108,6 +108,7 @@ func (h *FEHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	u := &domain.FEUser{
 		MemberID:   memberID,
 		Name:       name,
+		Furigana:   strings.TrimSpace(req.Furigana),
 		Role:       role,
 		Genre:      strings.TrimSpace(req.Genre),
 		Generation: req.Generation,

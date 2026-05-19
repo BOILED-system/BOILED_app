@@ -38,6 +38,7 @@ export default function ProfilePage() {
   const [newMember, setNewMember] = useState({
     memberId: '',
     name: '',
+    furigana: '',
     genre: GENRES[0],
     generation: '',
     role: 'member' as 'admin' | 'member',
@@ -177,12 +178,13 @@ export default function ProfilePage() {
       await createUser({
         memberId,
         name,
+        furigana: newMember.furigana.trim() || undefined,
         role: newMember.role,
         genre: newMember.genre,
         generation,
       });
       setShowAddMember(false);
-      setNewMember({ memberId: '', name: '', genre: GENRES[0], generation: '', role: 'member' });
+      setNewMember({ memberId: '', name: '', furigana: '', genre: GENRES[0], generation: '', role: 'member' });
       alert(`${name} さんを追加しました`);
     } catch (e: any) {
       const msg = String(e?.message || '');
@@ -396,6 +398,16 @@ export default function ProfilePage() {
                     className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20"
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-white/50 block mb-1">ふりがな（任意）</label>
+                  <input
+                    type="text"
+                    value={newMember.furigana}
+                    onChange={e => setNewMember({ ...newMember, furigana: e.target.value })}
+                    placeholder="例：やまだ たろう"
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-white/50 block mb-1">代</label>
@@ -478,7 +490,7 @@ export default function ProfilePage() {
                   type="text"
                   value={memberSearch}
                   onChange={e => setMemberSearch(e.target.value)}
-                  placeholder="名前または会員番号で検索"
+                  placeholder="名前・ふりがな・会員番号で検索"
                   className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20"
                 />
                 <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg max-h-72 overflow-y-auto">
@@ -486,7 +498,7 @@ export default function ProfilePage() {
                     .filter(m => {
                       const q = memberSearch.trim().toLowerCase();
                       if (!q) return true;
-                      return m.name.toLowerCase().includes(q) || m.memberId.toLowerCase().includes(q);
+                      return m.name.toLowerCase().includes(q) || m.memberId.toLowerCase().includes(q) || (m.furigana || '').toLowerCase().includes(q);
                     })
                     .sort((a, b) => (b.generation ?? 0) - (a.generation ?? 0) || a.name.localeCompare(b.name))
                     .map(m => (

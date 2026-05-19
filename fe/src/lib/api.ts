@@ -95,6 +95,7 @@ export async function getAllUsers(): Promise<FEUser[]> {
 export async function createUser(data: {
   memberId: string;
   name: string;
+  furigana?: string;
   role: 'admin' | 'member';
   genre: string;
   generation: number;

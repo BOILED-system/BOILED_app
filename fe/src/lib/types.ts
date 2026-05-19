@@ -20,6 +20,7 @@ export interface TimetableRow {
 export interface FEUser {
   memberId: string;
   name: string;
+  furigana?: string;
   role: 'admin' | 'member';
   genre: string;
   generation: number;

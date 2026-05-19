@@ -48,6 +48,7 @@ type FEPracticeRSVP struct {
 type FEUser struct {
 	MemberID   string `json:"memberId" firestore:"memberId"`
 	Name       string `json:"name" firestore:"name"`
+	Furigana   string `json:"furigana,omitempty" firestore:"furigana,omitempty"`
 	Role       string `json:"role" firestore:"role"` // "admin" | "member"
 	Genre      string `json:"genre" firestore:"genre"`
 	Generation int    `json:"generation" firestore:"generation"`

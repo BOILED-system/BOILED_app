@@ -38,7 +38,7 @@ export default function MemberSelectDropdown({
   const selectedIds = new Set(selected.map(m => m.id));
   const filtered = allUsers
     .filter(u => !selectedIds.has(u.memberId))
-    .filter(u => !search || u.name.includes(search) || u.memberId.includes(search));
+    .filter(u => !search || u.name.includes(search) || u.memberId.includes(search) || (u.furigana || '').includes(search));
 
   const chipClass =
     chipColor === 'green'
@@ -73,7 +73,7 @@ export default function MemberSelectDropdown({
             <div className="p-2 border-b border-white/[0.06]">
               <input
                 type="text"
-                placeholder="名前・会員番号で検索..."
+                placeholder="名前・ふりがな・会員番号で検索..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 autoFocus

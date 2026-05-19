@@ -8,6 +8,7 @@ import "github.com/noa/circle-app/api/domain"
 type CreateUserFERequest struct {
 	MemberID   string `json:"memberId"`
 	Name       string `json:"name"`
+	Furigana   string `json:"furigana"`
 	Role       string `json:"role"`
 	Genre      string `json:"genre"`
 	Generation int    `json:"generation"`
