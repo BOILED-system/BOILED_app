@@ -103,6 +103,27 @@ export async function createUser(data: {
   return apiPost<FEUser>('/api/users', data);
 }
 
+export async function updateUser(data: {
+  memberId: string;
+  name: string;
+  furigana?: string;
+  role: 'admin' | 'member';
+  genre: string;
+  generation: number;
+}): Promise<FEUser> {
+  const { memberId, ...body } = data;
+  const res = await fetch(`${API_BASE}/api/users/${memberId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
 export async function deleteUser(memberId: string): Promise<void> {
   return apiDelete(`/api/users/${memberId}`);
 }

@@ -8,6 +8,7 @@ import {
   getMyUnpaidSettlements,
   submitRSVP,
   createUser,
+  updateUser,
   deleteUser,
   getAllUsers,
 } from "@/lib/api";
@@ -47,6 +48,7 @@ export default function ProfilePage() {
   const [addMemberError, setAddMemberError] = useState('');
   const [addMode, setAddMode] = useState<'single' | 'bulk' | 'delete'>('single');
   const [bulkText, setBulkText] = useState('');
+  const [bulkOverwrite, setBulkOverwrite] = useState(false);
   const [bulkResults, setBulkResults] = useState<{ row: number; memberId: string; name: string; ok: boolean; error?: string }[]>([]);
   const [allMembers, setAllMembers] = useState<FEUser[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
@@ -114,31 +116,31 @@ export default function ProfilePage() {
       setAddMemberError('1行以上入力してください');
       return;
     }
-    const parsed: { row: number; memberId: string; name: string; generation: number; genre: string; role: 'admin' | 'member'; error?: string }[] = [];
+    const parsed: { row: number; memberId: string; name: string; furigana: string; generation: number; genre: string; role: 'admin' | 'member'; error?: string }[] = [];
     lines.forEach((line, i) => {
       if (i === 0 && /会員番号|memberId/i.test(line)) return;
       const sep = line.includes('\t') ? '\t' : ',';
       const cols = line.split(sep).map(c => c.trim());
       if (cols.length < 4) {
-        parsed.push({ row: i + 1, memberId: '', name: '', generation: 0, genre: '', role: 'member', error: '列数が足りません（4列以上必要）' });
+        parsed.push({ row: i + 1, memberId: '', name: '', furigana: '', generation: 0, genre: '', role: 'member', error: '列数が足りません（4列以上必要）' });
         return;
       }
-      const [memberId, name, genStr, genre, roleStr] = cols;
+      const [memberId, name, genStr, genre, roleStr, furigana = ''] = cols;
       const generation = parseInt(genStr.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10);
       if (!memberId || !name) {
-        parsed.push({ row: i + 1, memberId, name, generation: 0, genre: '', role: 'member', error: '会員番号と名前は必須' });
+        parsed.push({ row: i + 1, memberId, name, furigana, generation: 0, genre: '', role: 'member', error: '会員番号と名前は必須' });
         return;
       }
       if (!Number.isFinite(generation) || generation < 0) {
-        parsed.push({ row: i + 1, memberId, name, generation: 0, genre: '', role: 'member', error: '代が不正' });
+        parsed.push({ row: i + 1, memberId, name, furigana, generation: 0, genre: '', role: 'member', error: '代が不正' });
         return;
       }
       if (!GENRES.includes(genre)) {
-        parsed.push({ row: i + 1, memberId, name, generation, genre, role: 'member', error: `ジャンルは ${GENRES.join('/')} のいずれか` });
+        parsed.push({ row: i + 1, memberId, name, furigana, generation, genre, role: 'member', error: `ジャンルは ${GENRES.join('/')} のいずれか` });
         return;
       }
       const role = (roleStr === 'admin' ? 'admin' : 'member') as 'admin' | 'member';
-      parsed.push({ row: i + 1, memberId, name, generation, genre, role });
+      parsed.push({ row: i + 1, memberId, name, furigana, generation, genre, role });
     });
 
     setAddingMember(true);
@@ -148,8 +150,19 @@ export default function ProfilePage() {
         results.push({ row: p.row, memberId: p.memberId, name: p.name, ok: false, error: p.error });
         continue;
       }
+      const userData = { memberId: p.memberId, name: p.name, furigana: p.furigana || undefined, role: p.role, genre: p.genre, generation: p.generation };
       try {
-        await createUser({ memberId: p.memberId, name: p.name, role: p.role, genre: p.genre, generation: p.generation });
+        if (bulkOverwrite) {
+          await updateUser(userData).catch(async (e: any) => {
+            if (String(e?.message || '').includes('404')) {
+              await createUser(userData);
+            } else {
+              throw e;
+            }
+          });
+        } else {
+          await createUser(userData);
+        }
         results.push({ row: p.row, memberId: p.memberId, name: p.name, ok: true });
       } catch (e: any) {
         const msg = String(e?.message || '');
@@ -447,16 +460,25 @@ export default function ProfilePage() {
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-white/50 mb-2">
-                    1行に1人。スプレッドシートからそのままコピペ可。列の順番は <span className="text-white/70">会員番号・名前・代・ジャンル・役割</span>。役割は省略可（デフォルトmember）。
+                    1行に1人。スプレッドシートからそのままコピペ可。列の順番は <span className="text-white/70">会員番号・名前・代・ジャンル・役割・ふりがな</span>。役割・ふりがなは省略可。
                   </p>
-                  <p className="text-[10px] text-white/40 mb-2">
+                  <p className="text-[10px] text-white/40 mb-3">
                     ジャンル: {GENRES.join('/')}
                   </p>
+                  <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bulkOverwrite}
+                      onChange={e => setBulkOverwrite(e.target.checked)}
+                      className="accent-blue-500"
+                    />
+                    <span className="text-xs text-white/60">既存メンバーを上書き更新する</span>
+                  </label>
                   <textarea
                     rows={8}
                     value={bulkText}
                     onChange={e => setBulkText(e.target.value)}
-                    placeholder={`16199,田中太郎,53,Hiphop,member\n16200,鈴木花子,53,House,admin\n16201,佐藤次郎,54,Break`}
+                    placeholder={`16199,田中太郎,53,Hiphop,member,たなか たろう\n16200,鈴木花子,53,House,admin,すずき はなこ\n16201,佐藤次郎,54,Break`}
                     className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/30 font-mono resize-none focus:outline-none focus:border-white/20"
                   />
                 </div>

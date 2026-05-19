@@ -466,9 +466,9 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
       {/* 日程追加モーダル */}
       {showAddSchedule && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddSchedule(false)} />
-          <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl">
+          <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-white">日程を追加</h2>
               <button type="button" onClick={() => setShowAddSchedule(false)} aria-label="閉じる"
@@ -517,7 +517,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
       {/* 編集モーダル */}
       {editingSession && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingSession(null)} />
           <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <h2 className="text-base font-bold text-white">日程を編集</h2>
@@ -567,7 +567,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
       {/* プロジェクト全体の対象者編集モーダル */}
       {showProjectMembers && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowProjectMembers(false)} />
           <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between">

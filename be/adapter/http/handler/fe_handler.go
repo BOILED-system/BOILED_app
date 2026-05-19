@@ -124,6 +124,42 @@ func (h *FEHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, u)
 }
 
+// UpdateUser handles PUT /api/users/{memberId}
+func (h *FEHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	memberID := r.PathValue("memberId")
+	var req dto.CreateUserFERequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	role := req.Role
+	if role != "admin" && role != "member" {
+		role = "member"
+	}
+	u := &domain.FEUser{
+		MemberID:   memberID,
+		Name:       name,
+		Furigana:   strings.TrimSpace(req.Furigana),
+		Role:       role,
+		Genre:      strings.TrimSpace(req.Genre),
+		Generation: req.Generation,
+	}
+	if err := h.interactor.UpdateUser(r.Context(), u); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "member not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, u)
+}
+
 // ===== Practice Sessions =====
 
 // GetPracticeSessions handles GET /api/practice-sessions

@@ -66,6 +66,16 @@ func (i *FEInteractor) CreateUser(ctx context.Context, u *domain.FEUser) error {
 	return i.userRepo.Save(ctx, u)
 }
 
+// UpdateUser overwrites an existing user's profile fields.
+func (i *FEInteractor) UpdateUser(ctx context.Context, u *domain.FEUser) error {
+	existing, err := i.userRepo.GetByMemberID(ctx, u.MemberID)
+	if err != nil || existing == nil {
+		return domain.ErrNotFound
+	}
+	u.UpdatedAt = time.Now()
+	return i.userRepo.Save(ctx, u)
+}
+
 // DeleteUser removes a user and all related records (RSVPs, payments, roster memberships).
 func (i *FEInteractor) DeleteUser(ctx context.Context, memberID string) error {
 	if _, err := i.userRepo.GetByMemberID(ctx, memberID); err != nil {

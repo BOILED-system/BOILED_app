@@ -54,15 +54,19 @@ func (h *CalendarHandler) PracticesICal(w http.ResponseWriter, r *http.Request) 
 		if !isSessionForMember(s, memberID, user, rosters) {
 			continue
 		}
-		startUTC, endUTC, ok := parseSessionRange(s.Date, s.StartTime, s.EndTime, jst)
-		if !ok {
-			continue
-		}
 		summary := s.Name
 		if s.Location != "" {
 			summary = s.Name + " / " + s.Location
 		}
-		writeVEvent(&b, "practice-"+s.ID, now, startUTC, endUTC, summary, s.Location)
+		if s.StartTime == "" || s.StartTime == "未定" {
+			writeAllDayVEvent(&b, "practice-"+s.ID, now, s.Date, "", summary, s.Location)
+		} else {
+			startUTC, endUTC, ok := parseSessionRange(s.Date, s.StartTime, s.EndTime, jst)
+			if !ok {
+				continue
+			}
+			writeVEvent(&b, "practice-"+s.ID, now, startUTC, endUTC, summary, s.Location)
+		}
 	}
 
 	b.WriteString("END:VCALENDAR\r\n")
@@ -213,6 +217,9 @@ func isSessionForMember(s *domain.FEPracticeSession, memberID string, user *doma
 		if ex == memberID {
 			return false
 		}
+	}
+	if user.Genre == "Admin" {
+		return true
 	}
 	for _, ad := range s.AdditionalMemberIDs {
 		if ad == memberID {
