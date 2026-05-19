@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/api/**'
+      - 'be/**'
   workflow_dispatch: # 手動実行も可能
 
 env:
@@ -34,7 +34,7 @@ jobs:
         run: gcloud auth configure-docker --quiet
 
       - name: Build and push image
-        working-directory: ./apps/api
+        working-directory: ./be
         run: |
           docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/circle-api:latest .
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/circle-api:latest
