@@ -123,7 +123,7 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
       </div>
 
       <div className="bg-[#141824] border border-white/[0.08] rounded-xl overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-12rem)]">
+        <div className="overflow-auto max-h-[calc(100vh-12rem)] md:max-h-[calc(100vh-12rem)] pb-20 md:pb-0">
           <table className="w-full text-left text-sm text-white/80 whitespace-nowrap">
             <thead className="text-xs uppercase text-white/50">
               <tr>
