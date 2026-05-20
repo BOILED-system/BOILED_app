@@ -126,8 +126,8 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
           <table className="w-full text-left text-sm text-white/80 whitespace-nowrap">
             <thead className="text-xs uppercase text-white/50">
               <tr>
-                <th className="px-4 py-3 font-medium bg-[#1a2030] sticky left-0 top-0 z-30 w-20 border-b border-white/[0.08]">会員番号</th>
-                <th className="px-4 py-3 font-medium bg-[#1a2030] border-r border-white/[0.04] sticky left-[80px] top-0 z-30 min-w-[120px] border-b border-white/[0.08]">名前</th>
+                <th className="px-4 py-3 font-medium bg-[#1a2030] top-0 z-10 w-20 border-b border-white/[0.08]">会員番号</th>
+                <th className="px-4 py-3 font-medium bg-[#1a2030] border-r border-white/[0.04] sticky left-0 top-0 z-30 min-w-[120px] border-b border-white/[0.08]">名前</th>
                 <th className="px-4 py-3 font-medium bg-[#1a2030] sticky top-0 z-10 border-b border-white/[0.08]">ジャンル</th>
                 {sessions.map(s => (
                   <th key={s.id} className="px-4 py-3 font-medium text-center border-l border-white/[0.04] bg-[#1a2030] sticky top-0 z-10 border-b border-white/[0.08]">
@@ -137,7 +137,7 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
                 ))}
               </tr>
               <tr className="bg-[#141824] text-[10px]">
-                <th className="px-4 py-1.5 text-white/20 font-normal bg-[#141824] sticky left-0 z-30 border-b border-white/[0.06]" colSpan={3}>合計 / 未提出</th>
+                <th className="px-4 py-1.5 text-white/20 font-normal bg-[#141824] sticky left-0 top-12 z-20 border-b border-white/[0.06]" colSpan={3}>合計 / 未提出</th>
                 {sessions.map(s => {
                   const sessionRsvps = Object.values(rsvps[s.id] ?? {});
                   const go    = sessionRsvps.filter(r => r.status === 'GO').length;
@@ -146,7 +146,7 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
                   const early = sessionRsvps.filter(r => r.status === 'EARLY').length;
                   const unsubmitted = users.length - (go + no + late + early);
                   return (
-                    <th key={s.id} className="px-2 py-1.5 font-normal text-center border-l border-white/[0.04] border-b border-white/[0.06] leading-relaxed">
+                    <th key={s.id} className="px-2 py-1.5 font-normal text-center border-l border-white/[0.04] border-b border-white/[0.06] leading-relaxed bg-[#141824] sticky top-12 z-10">
                       {go > 0    && <div className="text-emerald-400">出 {go}</div>}
                       {no > 0    && <div className="text-red-400">欠 {no}</div>}
                       {late > 0  && <div className="text-yellow-400">遅 {late}</div>}
@@ -160,8 +160,8 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
             <tbody className="divide-y divide-white/[0.04]">
               {users.map(u => (
                 <tr key={u.memberId} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-2 font-mono text-xs text-white/40 bg-[#141824] sticky left-0 z-10">{u.memberId}</td>
-                  <td className="px-4 py-2 font-medium bg-[#141824] sticky left-[80px] z-10 border-r border-white/[0.04]">{u.name}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-white/40">{u.memberId}</td>
+                  <td className="px-4 py-2 font-medium bg-[#141824] sticky left-0 z-10 border-r border-white/[0.04]">{u.name}</td>
                   <td className="px-4 py-2 text-xs text-white/50">{u.genre} {u.generation}代</td>
                   
                   {sessions.map(s => {
