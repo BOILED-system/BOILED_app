@@ -50,7 +50,8 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
 
       // Determine targeted users. 
       // Simplest logic: if a user is targeted in ANY session of this group, they appear.
-      const targetedUsers = allUsers.filter(u => 
+      const targetedUsers = allUsers.filter(u =>
+        u.genre !== 'Admin' &&
         matchedSessions.some(s => isSessionForMember(s, u.memberId, u.genre, u.generation, rosters))
       ).sort((a, b) => parseInt(a.memberId) - parseInt(b.memberId));
 
