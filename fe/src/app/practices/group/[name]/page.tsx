@@ -137,7 +137,9 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
                 ))}
               </tr>
               <tr className="bg-[#141824] text-[10px]">
-                <th className="px-4 py-1.5 text-white/20 font-normal bg-[#141824] sticky left-0 top-12 z-20 border-b border-white/[0.06]" colSpan={3}>合計 / 未提出</th>
+                <th className="px-4 py-1.5 bg-[#141824] top-12 border-b border-white/[0.06]" />
+                <th className="px-4 py-1.5 text-white/20 font-normal bg-[#141824] sticky left-0 top-12 z-20 border-r border-white/[0.04] border-b border-white/[0.06]">合計 / 未提出</th>
+                <th className="px-4 py-1.5 bg-[#141824] top-12 border-b border-white/[0.06]" />
                 {sessions.map(s => {
                   const sessionRsvps = Object.values(rsvps[s.id] ?? {});
                   const go    = sessionRsvps.filter(r => r.status === 'GO').length;
