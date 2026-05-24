@@ -253,8 +253,10 @@ export default function PaymentsPage() {
       } else if (form.targetType === 'number') {
         const roster = numberRosters.find(r => r.id === form.targetNumberId);
         if (roster) {
-          const members = await Promise.all(roster.memberIds.map(id => getUser(id)));
-          payments = members.filter(Boolean).map(u => ({ memberId: u!.memberId as string, name: u!.name as string }));
+          const members = roster.memberIds
+            .map(id => allUsers.find(u => u.memberId === id))
+            .filter((u): u is FEUser => Boolean(u));
+          payments = members.map(u => ({ memberId: u.memberId as string, name: u.name as string }));
           resolvedMemberIds = roster.memberIds;
         }
       } else {
