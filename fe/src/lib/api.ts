@@ -33,13 +33,104 @@ export type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`API error ${res.status}: ${body}`);
+// ===== Client-side GET cache =====
+// Persists GET responses in sessionStorage with a TTL so repeated page navigations
+// don't re-hit the API (and Firestore behind it). Writes invalidate by prefix.
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_PREFIX = 'apiCache:';
+const inflight = new Map<string, Promise<unknown>>();
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+function cacheKey(path: string): string {
+  return CACHE_PREFIX + path;
+}
+
+function readCache<T>(path: string): T | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = sessionStorage.getItem(cacheKey(path));
+    if (!raw) return undefined;
+    const entry = JSON.parse(raw) as CacheEntry<T>;
+    if (Date.now() > entry.expiresAt) {
+      sessionStorage.removeItem(cacheKey(path));
+      return undefined;
+    }
+    return entry.value;
+  } catch {
+    return undefined;
   }
-  return res.json();
+}
+
+function writeCache<T>(path: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const entry: CacheEntry<T> = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+    sessionStorage.setItem(cacheKey(path), JSON.stringify(entry));
+  } catch {
+    // sessionStorage quota / disabled — silently skip
+  }
+}
+
+// Invalidate any cached GET whose path starts with one of the given prefixes.
+function invalidate(...prefixes: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (!key || !key.startsWith(CACHE_PREFIX)) continue;
+      const path = key.slice(CACHE_PREFIX.length);
+      if (prefixes.some(p => path.startsWith(p))) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function apiGet<T>(path: string, options?: { noCache?: boolean }): Promise<T> {
+  if (!options?.noCache) {
+    const cached = readCache<T>(path);
+    if (cached !== undefined) return cached;
+    const pending = inflight.get(path);
+    if (pending) return pending as Promise<T>;
+  }
+  const p = (async () => {
+    const res = await fetch(`${API_BASE}${path}`);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`API error ${res.status}: ${body}`);
+    }
+    const data = (await res.json()) as T;
+    if (!options?.noCache) writeCache(path, data);
+    return data;
+  })();
+  if (!options?.noCache) {
+    inflight.set(path, p);
+    p.finally(() => inflight.delete(path));
+  }
+  return p;
+}
+
+// Map a write path to the GET cache prefixes it invalidates.
+function invalidationPrefixesFor(path: string): string[] {
+  if (path.startsWith('/api/users')) return ['/api/users'];
+  if (path.startsWith('/api/practice-sessions')) {
+    return ['/api/practice-sessions', '/api/members/'];
+  }
+  if (path.startsWith('/api/members/') && path.endsWith('/rsvps')) {
+    return ['/api/members/', '/api/practice-sessions'];
+  }
+  if (path.startsWith('/api/number-rosters')) return ['/api/number-rosters'];
+  if (path.startsWith('/api/events')) return ['/api/events'];
+  if (path.startsWith('/api/settlements')) return ['/api/settlements'];
+  if (path.startsWith('/api/line/')) return ['/api/line/'];
+  return [];
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -52,6 +143,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
+  invalidate(...invalidationPrefixesFor(path));
   if (res.status === 204 || res.headers.get('content-length') === '0') {
     return undefined as T;
   }
@@ -68,6 +160,7 @@ async function apiPut(path: string, body: unknown): Promise<void> {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
+  invalidate(...invalidationPrefixesFor(path));
 }
 
 async function apiDelete(path: string): Promise<void> {
@@ -75,6 +168,20 @@ async function apiDelete(path: string): Promise<void> {
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
+  }
+  invalidate(...invalidationPrefixesFor(path));
+}
+
+// Clear all cached GETs. Exported so pages can force-refresh after major mutations.
+export function clearApiCache(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
   }
 }
 
@@ -121,6 +228,7 @@ export async function updateUser(data: {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
+  invalidate('/api/users');
   return res.json();
 }
 
