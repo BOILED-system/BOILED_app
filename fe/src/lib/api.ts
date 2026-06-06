@@ -37,7 +37,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 // Persists GET responses in sessionStorage with a TTL so repeated page navigations
 // don't re-hit the API (and Firestore behind it). Writes invalidate by prefix.
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_PREFIX = 'apiCache:';
 const inflight = new Map<string, Promise<unknown>>();
 
@@ -128,7 +128,7 @@ function invalidationPrefixesFor(path: string): string[] {
   }
   if (path.startsWith('/api/number-rosters')) return ['/api/number-rosters'];
   if (path.startsWith('/api/events')) return ['/api/events'];
-  if (path.startsWith('/api/settlements')) return ['/api/settlements'];
+  if (path.startsWith('/api/settlements')) return ['/api/settlements', '/api/members/'];
   if (path.startsWith('/api/line/')) return ['/api/line/'];
   return [];
 }
@@ -398,6 +398,13 @@ export async function getSettlementPayments(settlementId: string): Promise<Payme
   return apiGet<PaymentRecord[]>(`/api/settlements/${settlementId}/payments`);
 }
 
+// Returns a map of settlementId -> the member's payment record across every settlement.
+// One round-trip backed by a Firestore collection group query, replacing the
+// N-per-settlement fetch loop on payments / profile pages.
+export async function getMyPayments(memberId: string): Promise<Record<string, PaymentRecord>> {
+  return apiGet<Record<string, PaymentRecord>>(`/api/members/${memberId}/payments`);
+}
+
 export async function reportPayment(
   settlementId: string,
   memberId: string,
@@ -498,16 +505,16 @@ export async function getUpcomingUnregisteredSessions(memberId: string): Promise
 }
 
 export async function getMyUnpaidSettlements(memberId: string): Promise<Settlement[]> {
-  const settlements = await getSettlements();
-  const mine = settlements.filter(s => s.resolvedMemberIds?.includes(memberId));
-  const unpaid: Settlement[] = [];
-  await Promise.all(
-    mine.map(async s => {
-      const payments = await getSettlementPayments(s.id);
-      const rec = payments.find(p => p.memberId === memberId);
-      if (!rec || rec.status === 'unpaid') unpaid.push(s);
-    })
-  );
+  const [settlements, myPayments] = await Promise.all([
+    getSettlements(),
+    getMyPayments(memberId),
+  ]);
+  const unpaid = settlements
+    .filter(s => s.resolvedMemberIds?.includes(memberId))
+    .filter(s => {
+      const rec = myPayments[s.id];
+      return !rec || rec.status === 'unpaid';
+    });
   return unpaid.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 }
 

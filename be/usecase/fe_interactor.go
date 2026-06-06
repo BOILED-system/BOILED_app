@@ -249,6 +249,12 @@ func (i *FEInteractor) GetSettlementPayments(ctx context.Context, settlementID s
 	return i.paymentRepo.GetBySettlement(ctx, settlementID)
 }
 
+// GetMyPayments returns all payment records for the given member across every settlement,
+// keyed by settlement ID. Backed by a Firestore collection group query.
+func (i *FEInteractor) GetMyPayments(ctx context.Context, memberID string) (map[string]*domain.FEPaymentRecord, error) {
+	return i.paymentRepo.GetByMember(ctx, memberID)
+}
+
 func (i *FEInteractor) ReportPayment(ctx context.Context, settlementID, memberID, method string, requiresConfirmation bool, cashCollectorID, cashCollectorName string) error {
 	status := "confirmed"
 	if requiresConfirmation {

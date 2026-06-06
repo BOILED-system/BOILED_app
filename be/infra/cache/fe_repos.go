@@ -394,11 +394,27 @@ func (r *cachedFEPaymentRepo) GetBySettlement(ctx context.Context, settlementID 
 	return payments, nil
 }
 
+func (r *cachedFEPaymentRepo) GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPaymentRecord, error) {
+	key := fmt.Sprintf("payments:member:%s", memberID)
+	if v, ok := r.store.Get(key); ok {
+		return v.(map[string]*domain.FEPaymentRecord), nil
+	}
+	records, err := r.inner.GetByMember(ctx, memberID)
+	if err != nil {
+		return nil, err
+	}
+	r.store.Set(key, records, MemberRSVPTTL)
+	return records, nil
+}
+
 func (r *cachedFEPaymentRepo) Create(ctx context.Context, settlementID string, p *domain.FEPaymentRecord) error {
 	if err := r.inner.Create(ctx, settlementID, p); err != nil {
 		return err
 	}
-	r.store.Delete(fmt.Sprintf("payments:settlement:%s", settlementID))
+	r.store.Delete(
+		fmt.Sprintf("payments:settlement:%s", settlementID),
+		fmt.Sprintf("payments:member:%s", p.MemberID),
+	)
 	return nil
 }
 
@@ -406,7 +422,10 @@ func (r *cachedFEPaymentRepo) Update(ctx context.Context, settlementID, memberID
 	if err := r.inner.Update(ctx, settlementID, memberID, data); err != nil {
 		return err
 	}
-	r.store.Delete(fmt.Sprintf("payments:settlement:%s", settlementID))
+	r.store.Delete(
+		fmt.Sprintf("payments:settlement:%s", settlementID),
+		fmt.Sprintf("payments:member:%s", memberID),
+	)
 	return nil
 }
 

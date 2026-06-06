@@ -45,16 +45,39 @@ func (r *fePaymentRepository) Update(ctx context.Context, settlementID, memberID
 	return err
 }
 
+// GetByMember returns all payment records for a member, keyed by settlement ID.
+// Uses a collection group query on "payments" filtered by memberId so reads scale
+// with the number of payment records this member actually has.
+func (r *fePaymentRepository) GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPaymentRecord, error) {
+	docs, err := r.client.CollectionGroup("payments").Where("memberId", "==", memberID).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]*domain.FEPaymentRecord, len(docs))
+	for _, doc := range docs {
+		parent := doc.Ref.Parent.Parent
+		if parent == nil {
+			continue
+		}
+		var p domain.FEPaymentRecord
+		if err := doc.DataTo(&p); err != nil {
+			continue
+		}
+		result[parent.ID] = &p
+	}
+	return result, nil
+}
+
+// DeleteByMember removes every payment record belonging to a member across all settlements.
 func (r *fePaymentRepository) DeleteByMember(ctx context.Context, memberID string) error {
-	settlementDocs, err := r.client.Collection(feSettlementCollection).Documents(ctx).GetAll()
+	docs, err := r.client.CollectionGroup("payments").Where("memberId", "==", memberID).Documents(ctx).GetAll()
 	if err != nil {
 		return err
 	}
 	batch := r.client.Batch()
 	count := 0
-	for _, sd := range settlementDocs {
-		ref := r.client.Collection(feSettlementCollection).Doc(sd.Ref.ID).Collection("payments").Doc(memberID)
-		batch.Delete(ref)
+	for _, d := range docs {
+		batch.Delete(d.Ref)
 		count++
 		if count >= 400 {
 			if _, err := batch.Commit(ctx); err != nil {

@@ -495,6 +495,18 @@ func (h *FEHandler) GetSettlementPayments(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, payments)
 }
 
+// GetMyPayments handles GET /api/members/{memberId}/payments
+// Returns a map of settlementId -> payment record for the given member.
+func (h *FEHandler) GetMyPayments(w http.ResponseWriter, r *http.Request) {
+	memberID := r.PathValue("memberId")
+	payments, err := h.interactor.GetMyPayments(r.Context(), memberID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, payments)
+}
+
 // ReportPaymentFE handles POST /api/settlements/{id}/report-payment
 func (h *FEHandler) ReportPaymentFE(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
