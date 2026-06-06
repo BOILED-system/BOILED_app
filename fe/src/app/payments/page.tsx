@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   getSettlements,
   getSettlementPayments,
+  getMyPayments,
   createSettlement,
   updateSettlement,
   updatePaymentStatus,
@@ -118,10 +119,11 @@ export default function PaymentsPage() {
 
   const load = async (mid: string) => {
     try {
-      const [settlements, rosters, users] = await Promise.all([
+      const [settlements, rosters, users, myPayments] = await Promise.all([
         getSettlements(),
         getNumberRosters(),
         getAllUsers(),
+        getMyPayments(mid),
       ]);
       setAllSettlements(settlements);
       setNumberRosters(rosters);
@@ -129,12 +131,9 @@ export default function PaymentsPage() {
 
       const incoming = settlements.filter(s => s.resolvedMemberIds?.includes(mid));
       const statusMap: Record<string, PaymentRecord | null> = {};
-      await Promise.all(
-        incoming.map(async s => {
-          const payments = await getSettlementPayments(s.id);
-          statusMap[s.id] = payments.find(p => p.memberId === mid) ?? null;
-        })
-      );
+      for (const s of incoming) {
+        statusMap[s.id] = myPayments[s.id] ?? null;
+      }
       setMyRecords(statusMap);
     } catch (e) {
       console.error(e);

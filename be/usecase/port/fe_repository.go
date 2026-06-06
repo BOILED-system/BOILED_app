@@ -64,6 +64,7 @@ type FESettlementRepository interface {
 type FEPaymentRepository interface {
 	Create(ctx context.Context, settlementID string, p *domain.FEPaymentRecord) error
 	GetBySettlement(ctx context.Context, settlementID string) ([]*domain.FEPaymentRecord, error)
+	GetByMember(ctx context.Context, memberID string) (map[string]*domain.FEPaymentRecord, error)
 	Update(ctx context.Context, settlementID, memberID string, data map[string]interface{}) error
 	DeleteByMember(ctx context.Context, memberID string) error
 }
