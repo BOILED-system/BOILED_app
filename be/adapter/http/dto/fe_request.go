@@ -19,6 +19,8 @@ type CreateUserFERequest struct {
 type CreatePracticeSessionFERequest struct {
 	Name              string   `json:"name"`
 	Date              string   `json:"date"`
+	EndDate           string   `json:"endDate"`
+	IsOvernight       bool     `json:"isOvernight"`
 	StartTime         string   `json:"startTime"`
 	EndTime           string   `json:"endTime"`
 	Location          string   `json:"location"`
@@ -118,6 +120,8 @@ type UpdatePaymentStatusRequest struct {
 type SyncPracticeSession struct {
 	Name              string   `json:"name"`
 	Date              string   `json:"date"`
+	EndDate           string   `json:"endDate"`
+	IsOvernight       bool     `json:"isOvernight"`
 	StartTime         string   `json:"startTime"`
 	EndTime           string   `json:"endTime"`
 	Location          string   `json:"location"`

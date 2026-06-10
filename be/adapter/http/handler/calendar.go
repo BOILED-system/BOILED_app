@@ -58,7 +58,9 @@ func (h *CalendarHandler) PracticesICal(w http.ResponseWriter, r *http.Request) 
 		if s.Location != "" {
 			summary = s.Name + " / " + s.Location
 		}
-		if s.StartTime == "" || s.StartTime == "未定" {
+		if s.IsOvernight {
+			writeAllDayVEvent(&b, "practice-"+s.ID, now, s.Date, s.EndDate, summary, s.Location)
+		} else if s.StartTime == "" || s.StartTime == "未定" {
 			writeAllDayVEvent(&b, "practice-"+s.ID, now, s.Date, "", summary, s.Location)
 		} else {
 			startUTC, endUTC, ok := parseSessionRange(s.Date, s.StartTime, s.EndTime, jst)

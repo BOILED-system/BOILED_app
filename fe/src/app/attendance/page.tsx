@@ -190,8 +190,17 @@ export default function AttendancePage() {
                         )}
                       </div>
                       <p className="text-base font-bold text-white">
-                        {session.date}
-                        <span className="text-sm font-normal text-white/70 ml-2">{session.startTime}</span>
+                        {session.isOvernight ? (
+                          <>
+                            {session.date} 〜 {session.endDate}
+                            <span className="text-xs font-normal text-indigo-300 ml-2">深夜練</span>
+                          </>
+                        ) : (
+                          <>
+                            {session.date}
+                            <span className="text-sm font-normal text-white/70 ml-2">{session.startTime}</span>
+                          </>
+                        )}
                         {session.location && <span className="text-sm font-normal text-white/50"> · {session.location}</span>}
                       </p>
                       <h3 className="text-xs text-white/40 mt-0.5">{session.name}</h3>

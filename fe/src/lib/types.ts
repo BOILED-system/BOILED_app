@@ -30,6 +30,8 @@ export interface PracticeSession {
   id: string;
   name: string;
   date: string;
+  endDate?: string;
+  isOvernight?: boolean;
   startTime: string;
   endTime: string;
   location: string;

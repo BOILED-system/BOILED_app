@@ -15,7 +15,9 @@ const (
 type FEPracticeSession struct {
 	ID                string   `json:"id" firestore:"id"`
 	Name              string   `json:"name" firestore:"name"`
-	Date              string   `json:"date" firestore:"date"` // "2025-04-15"
+	Date              string   `json:"date" firestore:"date"`       // "2025-04-15"
+	EndDate           string   `json:"endDate,omitempty" firestore:"endDate,omitempty"` // 深夜練の翌日終了日
+	IsOvernight       bool     `json:"isOvernight,omitempty" firestore:"isOvernight,omitempty"`
 	StartTime         string   `json:"startTime" firestore:"startTime"`
 	EndTime           string   `json:"endTime" firestore:"endTime"`
 	Location          string   `json:"location" firestore:"location"`

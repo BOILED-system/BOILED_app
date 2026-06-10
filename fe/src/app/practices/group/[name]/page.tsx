@@ -80,7 +80,7 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
   }, [load]);
 
   const handleExportCSV = () => {
-    let csv = `\uFEFF会員番号,名前,ジャンル,期,${sessions.map(s => `${s.date}(${s.startTime})`).join(',')}\n`;
+    let csv = `\uFEFF会員番号,名前,ジャンル,期,${sessions.map(s => s.isOvernight ? `${s.date}〜${s.endDate}(深夜練)` : `${s.date}(${s.startTime})`).join(',')}\n`;
     
     users.forEach(u => {
       let row = `${u.memberId},${u.name},${u.genre},${u.generation}`;
@@ -132,8 +132,17 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
                 <th className="px-4 py-3 font-medium bg-[#1a2030] sticky top-0 z-10 border-b border-white/[0.08]">ジャンル</th>
                 {sessions.map(s => (
                   <th key={s.id} className="px-4 py-3 font-medium text-center border-l border-white/[0.04] bg-[#1a2030] sticky top-0 z-10 border-b border-white/[0.08]">
-                    <div>{s.date.split('-').slice(1).join('/')}</div>
-                    <div className="text-[10px] text-white/30">{s.startTime}</div>
+                    {s.isOvernight ? (
+                      <>
+                        <div>{s.date.split('-').slice(1).join('/')}〜{(s.endDate || '').split('-').slice(1).join('/')}</div>
+                        <div className="text-[10px] text-indigo-300">深夜練</div>
+                      </>
+                    ) : (
+                      <>
+                        <div>{s.date.split('-').slice(1).join('/')}</div>
+                        <div className="text-[10px] text-white/30">{s.startTime}</div>
+                      </>
+                    )}
                   </th>
                 ))}
               </tr>

@@ -310,7 +310,9 @@ export default function ProfilePage() {
                   <p className="text-[11px] font-medium text-yellow-400 uppercase tracking-wide">出欠未登録</p>
                   <p className="text-sm font-bold text-white mt-0.5">{session.name}</p>
                   <p className="text-xs text-white/40 mt-0.5">
-                    {session.date} {session.startTime}{session.endTime ? `〜${session.endTime}` : ''}
+                    {session.isOvernight
+                      ? `${session.date} 〜 ${session.endDate} 深夜練`
+                      : `${session.date} ${session.startTime}${session.endTime ? `〜${session.endTime}` : ''}`}
                     {session.location && ` · ${session.location}`}
                   </p>
                 </div>
