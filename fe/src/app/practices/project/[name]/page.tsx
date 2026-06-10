@@ -33,8 +33,15 @@ const addTwoHours = (time: string): string => {
   return `${String((h + 2) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
+const nextDayISO = (date: string): string => {
+  if (!date) return '';
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 const EMPTY_FORM = {
-  name: '', date: '', startTime: '', endTime: '', location: '', note: '',
+  name: '', date: '', endDate: '', isOvernight: false, startTime: '', endTime: '', location: '', note: '',
   type: 'regular' as 'regular' | 'event' | 'team', targetType: 'genre_generation' as TargetType,
   targetGenres: [] as string[], targetGenerations: [] as number[],
   targetNumberId: '', targetMemberIds: [] as string[],
@@ -64,7 +71,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
   // 日程追加モーダルステート
   const [showAddSchedule, setShowAddSchedule] = useState(false);
-  const [addScheduleForm, setAddScheduleForm] = useState({ date: '', startTime: '19:00', endTime: '21:00', location: '' });
+  const [addScheduleForm, setAddScheduleForm] = useState({ date: '', endDate: '', isOvernight: false, startTime: '19:00', endTime: '21:00', location: '' });
   const [addScheduleSaving, setAddScheduleSaving] = useState(false);
 
   // プロジェクト全体の対象者編集ステート
@@ -177,7 +184,8 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const openEdit = (s: PracticeSession) => {
     setEditingSession(s);
     setEditForm({
-      name: s.name, date: s.date, startTime: s.startTime, endTime: s.endTime || '',
+      name: s.name, date: s.date, endDate: s.endDate || '', isOvernight: !!s.isOvernight,
+      startTime: s.startTime, endTime: s.endTime || '',
       location: s.location || '', note: s.note || '', type: s.type || 'regular',
       targetType: s.targetType || 'genre_generation',
       targetGenres: s.targetGenres || [], targetGenerations: s.targetGenerations || [],
@@ -189,18 +197,22 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
 
   const handleEditSave = async () => {
     if (!editingSession) return;
-    if (!editForm.name || !editForm.date || !editForm.startTime) { alert('必須項目が不足しています'); return; }
+    if (!editForm.name || !editForm.date) { alert('必須項目が不足しています'); return; }
+    if (!editForm.isOvernight && !editForm.startTime) { alert('開始時間は必須です'); return; }
+    if (editForm.isOvernight && !editForm.endDate) { alert('深夜練の終了日を指定してください'); return; }
     setEditSaving(true);
-    // 日時・場所のみを更新（対象者はプロジェクト全体編集で管理）
-    await updatePracticeSession(editingSession.id, {
-      name: editForm.name, date: editForm.date, startTime: editForm.startTime,
-      endTime: editForm.endTime, location: editForm.location, note: editForm.note,
-    });
-    setGroupSessions(prev => prev.map(s => s.id === editingSession.id ? {
-      ...s,
-      name: editForm.name, date: editForm.date, startTime: editForm.startTime,
-      endTime: editForm.endTime, location: editForm.location, note: editForm.note,
-    } : s));
+    const updates = {
+      name: editForm.name,
+      date: editForm.date,
+      endDate: editForm.isOvernight ? editForm.endDate : '',
+      isOvernight: editForm.isOvernight,
+      startTime: editForm.isOvernight ? '' : editForm.startTime,
+      endTime: editForm.isOvernight ? '' : editForm.endTime,
+      location: editForm.location,
+      note: editForm.note,
+    };
+    await updatePracticeSession(editingSession.id, updates);
+    setGroupSessions(prev => prev.map(s => s.id === editingSession.id ? { ...s, ...updates } : s));
     setEditSaving(false);
     setEditingSession(null);
   };
@@ -219,7 +231,9 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   };
 
   const handleAddSchedule = async () => {
-    if (!addScheduleForm.date || !addScheduleForm.startTime) { alert('日付と開始時間は必須です'); return; }
+    if (!addScheduleForm.date) { alert('日付は必須です'); return; }
+    if (!addScheduleForm.isOvernight && !addScheduleForm.startTime) { alert('開始時間は必須です'); return; }
+    if (addScheduleForm.isOvernight && !addScheduleForm.endDate) { alert('深夜練の終了日を指定してください'); return; }
     setAddScheduleSaving(true);
     try {
       const base = groupSessions[0];
@@ -228,8 +242,10 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       const payload = {
         name: groupName,
         date: addScheduleForm.date,
-        startTime: addScheduleForm.startTime,
-        endTime: addScheduleForm.endTime,
+        endDate: addScheduleForm.isOvernight ? addScheduleForm.endDate : '',
+        isOvernight: addScheduleForm.isOvernight,
+        startTime: addScheduleForm.isOvernight ? '' : addScheduleForm.startTime,
+        endTime: addScheduleForm.isOvernight ? '' : addScheduleForm.endTime,
         location: addScheduleForm.location,
         note: base?.note || '',
         type: base?.type || 'regular' as const,
@@ -248,7 +264,7 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
       setGroupSessions(prev =>
         [...prev, newSession].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       );
-      setAddScheduleForm({ date: '', startTime: '19:00', endTime: '21:00', location: '' });
+      setAddScheduleForm({ date: '', endDate: '', isOvernight: false, startTime: '19:00', endTime: '21:00', location: '' });
       setShowAddSchedule(false);
     } catch (e: any) {
       console.error('[handleAddSchedule]', e);
@@ -401,7 +417,16 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h2 className="text-base font-bold text-white">
-                      {session.date} <span className="text-white/60 text-sm ml-2">{session.startTime}{session.endTime ? `〜${session.endTime}` : ''}</span>
+                      {session.isOvernight ? (
+                        <>
+                          {session.date} 〜 {session.endDate}
+                          <span className="text-indigo-300 text-xs ml-2 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded-md">深夜練</span>
+                        </>
+                      ) : (
+                        <>
+                          {session.date} <span className="text-white/60 text-sm ml-2">{session.startTime}{session.endTime ? `〜${session.endTime}` : ''}</span>
+                        </>
+                      )}
                     </h2>
                     {session.location && (
                       <p className="text-sm font-semibold text-white/80 mt-1 bg-white/[0.06] inline-block px-2 py-0.5 rounded-md">
@@ -476,26 +501,59 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
             </div>
             <p className="text-[11px] text-white/40">対象者・ターゲット設定はプロジェクトの既存日程から引き継ぎます。</p>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">日付 <span className="text-red-400">*</span></label>
-                <input type="date" value={addScheduleForm.date}
-                  onChange={e => setAddScheduleForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={addScheduleForm.isOvernight}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setAddScheduleForm(f => ({
+                    ...f,
+                    isOvernight: checked,
+                    endDate: checked ? nextDayISO(f.date) : '',
+                    startTime: checked ? '' : (f.startTime || '19:00'),
+                    endTime: checked ? '' : (f.endTime || '21:00'),
+                  }));
+                }}
+                className="accent-indigo-500" />
+              <span className="text-xs text-indigo-300">深夜練（日跨ぎ）</span>
+            </label>
+
+            {addScheduleForm.isOvernight ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">開始日 <span className="text-red-400">*</span></label>
+                  <input type="date" value={addScheduleForm.date}
+                    onChange={e => setAddScheduleForm(f => ({ ...f, date: e.target.value, endDate: nextDayISO(e.target.value) }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">終了日 <span className="text-red-400">*</span></label>
+                  <input type="date" value={addScheduleForm.endDate}
+                    onChange={e => setAddScheduleForm(f => ({ ...f, endDate: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
               </div>
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">開始 <span className="text-red-400">*</span></label>
-                <input type="time" value={addScheduleForm.startTime}
-                  onChange={e => { const t = e.target.value; setAddScheduleForm(f => ({ ...f, startTime: t, endTime: addTwoHours(t) })); }}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">日付 <span className="text-red-400">*</span></label>
+                  <input type="date" value={addScheduleForm.date}
+                    onChange={e => setAddScheduleForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">開始 <span className="text-red-400">*</span></label>
+                  <input type="time" value={addScheduleForm.startTime}
+                    onChange={e => { const t = e.target.value; setAddScheduleForm(f => ({ ...f, startTime: t, endTime: addTwoHours(t) })); }}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">終了</label>
+                  <input type="time" value={addScheduleForm.endTime}
+                    onChange={e => setAddScheduleForm(f => ({ ...f, endTime: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
               </div>
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">終了</label>
-                <input type="time" value={addScheduleForm.endTime}
-                  onChange={e => setAddScheduleForm(f => ({ ...f, endTime: e.target.value }))}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-              </div>
-            </div>
+            )}
 
             <input type="text" placeholder="場所（任意）" value={addScheduleForm.location}
               onChange={e => setAddScheduleForm(f => ({ ...f, location: e.target.value }))}
@@ -526,24 +584,57 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
               onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
               className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none" />
 
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">日付</label>
-                <input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={editForm.isOvernight}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setEditForm(f => ({
+                    ...f,
+                    isOvernight: checked,
+                    endDate: checked ? (f.endDate || nextDayISO(f.date)) : '',
+                    startTime: checked ? '' : (f.startTime || '19:00'),
+                    endTime: checked ? '' : (f.endTime || '21:00'),
+                  }));
+                }}
+                className="accent-indigo-500" />
+              <span className="text-xs text-indigo-300">深夜練（日跨ぎ）</span>
+            </label>
+
+            {editForm.isOvernight ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">開始日</label>
+                  <input type="date" value={editForm.date}
+                    onChange={e => setEditForm(f => ({ ...f, date: e.target.value, endDate: nextDayISO(e.target.value) }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">終了日</label>
+                  <input type="date" value={editForm.endDate}
+                    onChange={e => setEditForm(f => ({ ...f, endDate: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
               </div>
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">開始</label>
-                <input type="time" value={editForm.startTime} onChange={e => {
-                  const start = e.target.value; setEditForm(f => ({ ...f, startTime: start, endTime: addTwoHours(start) }));
-                }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">日付</label>
+                  <input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">開始</label>
+                  <input type="time" value={editForm.startTime} onChange={e => {
+                    const start = e.target.value; setEditForm(f => ({ ...f, startTime: start, endTime: addTwoHours(start) }));
+                  }} className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-white/30 block mb-1">終了</label>
+                  <input type="time" value={editForm.endTime} onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
               </div>
-              <div>
-                <label className="text-[11px] text-white/30 block mb-1">終了</label>
-                <input type="time" value={editForm.endTime} onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
-                  className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-              </div>
-            </div>
+            )}
 
             <input type="text" placeholder="場所" value={editForm.location}
               onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}

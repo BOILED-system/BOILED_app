@@ -70,11 +70,30 @@ export default function CalendarPage() {
       const practiceItems: CalendarItem[] = targetedSessions.map(session => {
         const rsvp = myRSVPsMap[session.id] ?? null;
         const color = rsvp ? STATUS_COLORS[rsvp.status] : PRACTICE_COLOR;
+        const baseTitle = session.location ? `${session.name} / ${session.location}` : session.name;
+        if (session.isOvernight) {
+          // 深夜練：start日からendDate(inclusive)までを終日帯として描画。
+          // FullCalendarのend(date)はexclusiveなのでendDate+1日を渡す。
+          // 注意: new Date('YYYY-MM-DDT00:00:00') はローカルタイム解釈で、
+          // .toISOString() に変換するとJSTでは1日ズレる。UTC固定で計算する。
+          const endDateStr = session.endDate || session.date;
+          const d = new Date(`${endDateStr}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + 1);
+          const end = d.toISOString().slice(0, 10);
+          return {
+            id: session.id,
+            title: baseTitle,
+            start: session.date,
+            end,
+            type: 'practice',
+            url: `/practices/project/${encodeURIComponent(session.name)}`,
+            color,
+          };
+        }
         const endTime = session.endTime || addHours(session.startTime, 2);
-        const title = session.location ? `${session.name} / ${session.location}` : session.name;
         return {
           id: session.id,
-          title,
+          title: baseTitle,
           start: buildDateTime(session.date, session.startTime),
           end: endTime ? buildDateTime(session.date, endTime) : undefined,
           type: 'practice',

@@ -117,20 +117,33 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 
 // SyncPracticesFromSheet は date+name をキーに重複チェックし、新規のみ作成する。
 // アプリ側で編集済みのセッションは上書きしない。
+// 例外: 既存セッションが深夜練でない & 今回シートが深夜練として送ってきた場合は、
+// 日跨ぎフラグへ正規化する（旧スキーマからの移行用）。
 // 戻り値は作成件数。
 func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
 	existing, err := i.sessionRepo.GetAll(ctx)
 	if err != nil {
 		return 0, err
 	}
-	existingMap := make(map[string]struct{}, len(existing))
+	existingMap := make(map[string]*domain.FEPracticeSession, len(existing))
 	for _, s := range existing {
-		existingMap[s.Date+"_"+s.Name] = struct{}{}
+		existingMap[s.Date+"_"+s.Name] = s
 	}
 
 	created := 0
 	for _, s := range sessions {
-		if _, dup := existingMap[s.Date+"_"+s.Name]; dup {
+		if old, dup := existingMap[s.Date+"_"+s.Name]; dup {
+			if s.IsOvernight && !old.IsOvernight {
+				updates := map[string]interface{}{
+					"isOvernight": true,
+					"endDate":     s.EndDate,
+					"startTime":   "",
+					"endTime":     "",
+				}
+				if err := i.sessionRepo.Update(ctx, old.ID, updates); err != nil {
+					return created, err
+				}
+			}
 			continue
 		}
 		if err := i.sessionRepo.Create(ctx, s); err != nil {

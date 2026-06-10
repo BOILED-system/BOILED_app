@@ -193,6 +193,8 @@ func (h *FEHandler) CreatePracticeSession(w http.ResponseWriter, r *http.Request
 	s := &domain.FEPracticeSession{
 		Name:              req.Name,
 		Date:              req.Date,
+		EndDate:           req.EndDate,
+		IsOvernight:       req.IsOvernight,
 		StartTime:         req.StartTime,
 		EndTime:           req.EndTime,
 		Location:          req.Location,
@@ -609,6 +611,8 @@ func (h *FEHandler) SyncPracticesFromSheet(w http.ResponseWriter, r *http.Reques
 		sessions = append(sessions, &domain.FEPracticeSession{
 			Name:              s.Name,
 			Date:              s.Date,
+			EndDate:           s.EndDate,
+			IsOvernight:       s.IsOvernight,
 			StartTime:         s.StartTime,
 			EndTime:           s.EndTime,
 			Location:          s.Location,

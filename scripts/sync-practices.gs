@@ -257,6 +257,7 @@ function buildExpectedEvents() {
           endDate,
           eventDate,
           hasTime: !!timeMatch,
+          isNight: isNightPractice,
           location: getLocation(studioName),
           studioName,
         });
@@ -324,14 +325,19 @@ function syncToCalendar() {
     }
 
     const futureExpected = expectedList.filter(ev => {
+      // 深夜練は終日イベント扱いなので開始日基準で未来判定
+      if (ev.isNight && ev.startDate) return ev.startDate >= today;
       if (ev.hasTime) return ev.startDate && ev.startDate >= today;
       return ev.eventDate && ev.eventDate >= today;
     });
     const expectedMap = new Map(
       futureExpected.map(ev => {
-        const key = ev.hasTime
-          ? makeEventKey(ev.title, ev.startDate)
-          : makeAllDayKey(ev.title, ev.eventDate);
+        // 深夜練は2日にまたがる終日イベントとして登録するので、キーは開始日ベースの allday
+        const key = ev.isNight
+          ? makeAllDayKey(ev.title, ev.startDate || ev.eventDate)
+          : ev.hasTime
+            ? makeEventKey(ev.title, ev.startDate)
+            : makeAllDayKey(ev.title, ev.eventDate);
         return [key, ev];
       })
     );
@@ -403,9 +409,22 @@ function syncToCalendar() {
           }
         }
 
-        const newEvent = ev.hasTime
-          ? calendar.createEvent(ev.title, ev.startDate, ev.endDate)
-          : calendar.createAllDayEvent(ev.title, ev.eventDate);
+        let newEvent;
+        if (ev.isNight && ev.startDate && ev.endDate) {
+          // 深夜練：開始日〜終了日(翌日0時=exclusive 終端の翌日)の終日帯として登録
+          const allDayStart = new Date(ev.startDate);
+          allDayStart.setHours(0, 0, 0, 0);
+          const allDayEnd = new Date(ev.endDate);
+          allDayEnd.setHours(0, 0, 0, 0);
+          // GASのcreateAllDayEvent(title, start, end) は end exclusive。
+          // 終了日(inclusive)に+1して exclusive にする。
+          allDayEnd.setDate(allDayEnd.getDate() + 1);
+          newEvent = calendar.createAllDayEvent(ev.title, allDayStart, allDayEnd);
+        } else if (ev.hasTime) {
+          newEvent = calendar.createEvent(ev.title, ev.startDate, ev.endDate);
+        } else {
+          newEvent = calendar.createAllDayEvent(ev.title, ev.eventDate);
+        }
         newEvent.setDescription(SYNC_TAG);
         if (ev.location) newEvent.setLocation(ev.location);
         console.log(`登録: ${ev.title} @ ${key.split('|')[1]}`);
@@ -483,38 +502,49 @@ function syncToApp() {
       const name = `${category}${genreName}`;
 
       const pad = n => String(n).padStart(2, '0');
-      let dateStr, startTimeStr, endTimeStr;
+      const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      let dateStr = '', endDateStr = '', startTimeStr = '', endTimeStr = '';
 
-      if (ev.hasTime && ev.startDate) {
-        let sessionDate = ev.startDate;
-        let startHour   = ev.startDate.getHours();
-        let startMin    = ev.startDate.getMinutes();
-        let endHour     = ev.endDate.getHours();
-        let endMin      = ev.endDate.getMinutes();
-
-        if (isNight && startHour < 12) {
-          sessionDate = new Date(ev.startDate);
-          sessionDate.setDate(sessionDate.getDate() - 1);
-          startHour += 24;
-          endHour   += 24;
+      if (isNight) {
+        // 深夜練は終日扱いで2日にまたがる帯としてアプリに送る。
+        // 「8/9 23:00〜翌6:00」のような枠を「date=8/9, endDate=8/10, isOvernight=true」に正規化。
+        let startD, endD;
+        if (ev.hasTime && ev.startDate && ev.endDate) {
+          startD = new Date(ev.startDate);
+          endD = new Date(ev.endDate);
+          if (startD.getHours() < 12) {
+            // セルが翌日0:00以降になっているケース（buildExpectedEventsで翌日へずれた）。
+            // 開始日として前日に戻す。
+            startD.setDate(startD.getDate() - 1);
+          }
+        } else {
+          startD = new Date(ev.eventDate);
+          endD = new Date(ev.eventDate);
+          endD.setDate(endD.getDate() + 1);
         }
-
-        const d = sessionDate;
-        dateStr      = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        startTimeStr = `${startHour}:${pad(startMin)}`;
-        endTimeStr   = `${endHour}:${pad(endMin)}`;
+        dateStr = fmtDate(startD);
+        endDateStr = fmtDate(endD);
+        startTimeStr = '';
+        endTimeStr = '';
+      } else if (ev.hasTime && ev.startDate) {
+        const d = ev.startDate;
+        dateStr      = fmtDate(d);
+        startTimeStr = `${d.getHours()}:${pad(d.getMinutes())}`;
+        endTimeStr   = `${ev.endDate.getHours()}:${pad(ev.endDate.getMinutes())}`;
       } else {
         const d = new Date(ev.eventDate);
-        dateStr      = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        dateStr      = fmtDate(d);
         startTimeStr = '未定';
         endTimeStr   = '未定';
       }
 
-      const locationStr = (studioPart || ev.studioName || ev.location || '未定') + (isNight ? '（深夜練）' : '');
+      const locationStr = studioPart || ev.studioName || ev.location || '未定';
 
       sessions.push({
         name,
         date:         dateStr,
+        endDate:      endDateStr,
+        isOvernight:  isNight,
         startTime:    startTimeStr,
         endTime:      endTimeStr,
         location:     locationStr,

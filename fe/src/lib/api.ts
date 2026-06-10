@@ -253,6 +253,8 @@ export async function getPracticeSession(id: string): Promise<PracticeSession | 
 export async function createPracticeSession(data: {
   name: string;
   date: string;
+  endDate?: string;
+  isOvernight?: boolean;
   startTime: string;
   endTime: string;
   location: string;
