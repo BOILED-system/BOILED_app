@@ -199,6 +199,7 @@ function buildExpectedEvents() {
       const dateRaw = row[0];
       const category = normalizeCell(String(row[2]));
       if (!dateRaw) continue;
+      if (!category) continue; // 期間未入力の行は同期対象外（ジャンル名のみのプロジェクトが誤生成されるのを防ぐ）
 
       const baseDate = new Date(dateRaw);
       if (isNaN(baseDate.getTime())) continue;
@@ -581,6 +582,23 @@ function syncAll() {
 }
 
 // -----------------------------------------------------------------------
+// 時間ベーストリガーのセットアップ（GASエディタから1回だけ手動実行）
+// -----------------------------------------------------------------------
+
+function setupTrigger() {
+  // 既存の syncAll トリガーを削除してから再登録（重複防止）
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'syncAll') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('syncAll')
+    .timeBased()
+    .everyDays(1)
+    .atHour(9)
+    .create();
+  Logger.log('トリガー設定完了: syncAll を毎朝9時に実行');
+}
+
+// -----------------------------------------------------------------------
 // スプレッドシートを開いたときにメニューを追加
 // -----------------------------------------------------------------------
 
@@ -588,5 +606,6 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📅カレンダー同期')
     .addItem('カレンダーに同期', 'syncToCalendarWithUI')
+    .addItem('トリガーを設定（毎朝9時に自動同期）', 'setupTrigger')
     .addToUi();
 }
