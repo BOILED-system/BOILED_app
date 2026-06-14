@@ -2,6 +2,8 @@
 // These match the data model used by the Next.js frontend.
 package domain
 
+import "time"
+
 // TargetType specifies how a practice session or settlement targets members.
 type TargetType string
 
@@ -33,6 +35,11 @@ type FEPracticeSession struct {
 	CreatedBy            string   `json:"createdBy" firestore:"createdBy"`
 	CreatedByName        string   `json:"createdByName" firestore:"createdByName"`
 	CreatedAt            any      `json:"createdAt" firestore:"createdAt"`
+	// UpdatedAt はアプリまたはシート同期がこのセッションを最後に更新した時刻。
+	// SheetSyncedAt はシート同期が最後にこのセッションを書き込んだ時刻。
+	// updatedAt > sheetSyncedAt のとき「最終シート同期後にアプリで編集あり」と判定する。
+	UpdatedAt     *time.Time `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
+	SheetSyncedAt *time.Time `json:"sheetSyncedAt,omitempty" firestore:"sheetSyncedAt,omitempty"`
 }
 
 // FEPracticeRSVP represents a practice attendance record matching frontend schema.

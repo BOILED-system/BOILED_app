@@ -104,10 +104,13 @@ func (i *FEInteractor) GetPracticeSession(ctx context.Context, id string) (*doma
 }
 
 func (i *FEInteractor) CreatePracticeSession(ctx context.Context, s *domain.FEPracticeSession) error {
+	now := time.Now()
+	s.UpdatedAt = &now
 	return i.sessionRepo.Create(ctx, s)
 }
 
 func (i *FEInteractor) UpdatePracticeSession(ctx context.Context, id string, data map[string]interface{}) error {
+	data["updatedAt"] = time.Now()
 	return i.sessionRepo.Update(ctx, id, data)
 }
 
@@ -115,11 +118,16 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 	return i.sessionRepo.Delete(ctx, id)
 }
 
-// SyncPracticesFromSheet は date+name をキーに重複チェックし、新規のみ作成する。
-// アプリ側で編集済みのセッションは上書きしない。
-// 例外: 既存セッションが深夜練でない & 今回シートが深夜練として送ってきた場合は、
-// 日跨ぎフラグへ正規化する（旧スキーマからの移行用）。
-// 戻り値は作成件数。
+// SyncPracticesFromSheet は date+name をキーに重複チェックし、last-write-wins でセッションを同期する。
+//
+// 判定ロジック:
+//   - 新規（Firestoreに存在しない）→ 作成
+//   - 既存で updatedAt > sheetSyncedAt → 最後のシート同期後にアプリで編集されている → スキップ
+//   - 既存で updatedAt <= sheetSyncedAt（またはどちらも未設定）→ シートが最新 → スケジュール系フィールドを上書き
+//
+// 上書き対象フィールド: date/startTime/endTime/endDate/isOvernight/location/type/targetGenres
+// 保護するフィールド: note/targetType/targetMemberIds/additionalMemberIds/excludedMemberIds など
+// 戻り値は作成件数と更新件数。
 func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
 	existing, err := i.sessionRepo.GetAll(ctx)
 	if err != nil {
@@ -130,26 +138,40 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 		existingMap[s.Date+"_"+s.Name] = s
 	}
 
+	now := time.Now()
 	created := 0
 	for _, s := range sessions {
-		if old, dup := existingMap[s.Date+"_"+s.Name]; dup {
-			if s.IsOvernight && !old.IsOvernight {
-				updates := map[string]interface{}{
-					"isOvernight": true,
-					"endDate":     s.EndDate,
-					"startTime":   "",
-					"endTime":     "",
-				}
-				if err := i.sessionRepo.Update(ctx, old.ID, updates); err != nil {
-					return created, err
-				}
+		old, dup := existingMap[s.Date+"_"+s.Name]
+		if !dup {
+			s.UpdatedAt = &now
+			s.SheetSyncedAt = &now
+			if err := i.sessionRepo.Create(ctx, s); err != nil {
+				return created, err
 			}
+			created++
 			continue
 		}
-		if err := i.sessionRepo.Create(ctx, s); err != nil {
+
+		// last-write-wins: アプリが最後のシート同期より後に編集していたらスキップ
+		if old.UpdatedAt != nil && old.SheetSyncedAt != nil && old.UpdatedAt.After(*old.SheetSyncedAt) {
+			continue
+		}
+
+		updates := map[string]interface{}{
+			"date":          s.Date,
+			"startTime":     s.StartTime,
+			"endTime":       s.EndTime,
+			"location":      s.Location,
+			"type":          s.Type,
+			"targetGenres":  s.TargetGenres,
+			"isOvernight":   s.IsOvernight,
+			"endDate":       s.EndDate,
+			"updatedAt":     now,
+			"sheetSyncedAt": now,
+		}
+		if err := i.sessionRepo.Update(ctx, old.ID, updates); err != nil {
 			return created, err
 		}
-		created++
 	}
 	return created, nil
 }
