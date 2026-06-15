@@ -319,7 +319,8 @@ export async function getSessionRSVPs(sessionId: string): Promise<PracticeRSVP[]
 // ===== Number Rosters =====
 
 export async function getNumberRosters(): Promise<NumberRoster[]> {
-  return apiGet<NumberRoster[]>('/api/number-rosters');
+  const rosters = await apiGet<NumberRoster[]>('/api/number-rosters');
+  return rosters.map(r => ({ ...r, memberIds: r.memberIds?.filter(id => id != null) ?? [] }));
 }
 
 export async function createNumberRoster(data: {
@@ -469,7 +470,7 @@ export function isSessionForMember(
   }
   if (tt === 'number') {
     const roster = rosters.find(r => r.id === session.targetNumberId);
-    return roster?.memberIds.includes(memberId) ?? false;
+    return roster?.memberIds?.includes(memberId) ?? false;
   }
   if (tt === 'individual') {
     return session.targetMemberIds?.includes(memberId) ?? false;
