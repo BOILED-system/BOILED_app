@@ -44,8 +44,7 @@ export default function NumbersPage() {
   const load = async () => {
     try {
       const [data, users] = await Promise.all([getNumberRosters(), getAllUsers()]);
-      const normalized = data.map(r => ({ ...r, memberIds: r.memberIds?.filter(id => id != null) ?? [] }));
-      setRosters(normalized.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
+      setRosters(data.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
       setAllUsers(users);
       setLoading(false);
 

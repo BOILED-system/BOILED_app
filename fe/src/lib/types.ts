@@ -62,7 +62,7 @@ export interface PracticeRSVP {
 export interface NumberRoster {
   id: string;
   name: string;
-  memberIds: string[];
+  memberIds: string[];  // Firestore may store null; getNumberRosters() always normalizes to []
   createdAt: any;
 }
 
