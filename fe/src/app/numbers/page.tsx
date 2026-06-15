@@ -41,17 +41,26 @@ export default function NumbersPage() {
   }, []);
 
   const load = async () => {
-    const data = await getNumberRosters();
-    setRosters(data.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
-    setLoading(false);
+    try {
+      const data = await getNumberRosters();
+      setRosters(data.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
+      setLoading(false);
 
-    const allIds = Array.from(new Set(data.flatMap(r => r.memberIds)));
-    const names: Record<string, string> = {};
-    await Promise.all(allIds.map(async id => {
-      const u = await getUser(id);
-      if (u) names[id] = u.name as string;
-    }));
-    setMemberNames(names);
+      const allIds = Array.from(new Set(data.flatMap(r => r.memberIds)));
+      const names: Record<string, string> = {};
+      await Promise.all(allIds.map(async id => {
+        try {
+          const u = await getUser(id);
+          if (u) names[id] = u.name as string;
+        } catch {
+          // 名簿に残っているが削除済みのユーザーはスキップ
+        }
+      }));
+      setMemberNames(names);
+    } catch (e) {
+      console.error('名簿の読み込みに失敗しました', e);
+      setLoading(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -87,14 +96,22 @@ export default function NumbersPage() {
 
   const handleRemoveMember = async (rosterId: string, currentIds: string[], removeId: string) => {
     const newIds = currentIds.filter(id => id !== removeId);
-    await updateNumberRoster(rosterId, { memberIds: newIds });
-    setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
+    try {
+      await updateNumberRoster(rosterId, { memberIds: newIds });
+      setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
+    } catch (e: any) {
+      alert(`削除に失敗しました: ${e?.message || e}`);
+    }
   };
 
   const handleDelete = async (rosterId: string, rosterName: string) => {
     if (!confirm(`「${rosterName}」を削除しますか？`)) return;
-    await deleteNumberRoster(rosterId);
-    setRosters(prev => prev.filter(r => r.id !== rosterId));
+    try {
+      await deleteNumberRoster(rosterId);
+      setRosters(prev => prev.filter(r => r.id !== rosterId));
+    } catch (e: any) {
+      alert(`削除に失敗しました: ${e?.message || e}`);
+    }
   };
 
   // ===== CSV インポート =====
