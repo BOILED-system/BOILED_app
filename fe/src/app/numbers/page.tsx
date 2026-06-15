@@ -7,9 +7,10 @@ import {
   createNumberRoster,
   updateNumberRoster,
   deleteNumberRoster,
-  getUser,
+  getAllUsers,
 } from '@/lib/api';
-import type { NumberRoster } from '@/lib/api';
+import type { NumberRoster, FEUser } from '@/lib/api';
+import MemberSelectDropdown from '@/components/MemberSelectDropdown';
 
 export default function NumbersPage() {
   const [rosters, setRosters] = useState<NumberRoster[]>([]);
@@ -23,10 +24,10 @@ export default function NumbersPage() {
 
   // 展開・メンバー操作
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [memberInput, setMemberInput] = useState('');
   const [memberInputError, setMemberInputError] = useState('');
   const [memberInputLoading, setMemberInputLoading] = useState(false);
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  const [allUsers, setAllUsers] = useState<FEUser[]>([]);
 
   // CSVインポート
   const [csvMode, setCsvMode] = useState<string | null>(null); // roster.id or null
@@ -42,22 +43,15 @@ export default function NumbersPage() {
 
   const load = async () => {
     try {
-      const data = await getNumberRosters();
+      const [data, users] = await Promise.all([getNumberRosters(), getAllUsers()]);
       const normalized = data.map(r => ({ ...r, memberIds: r.memberIds?.filter(id => id != null) ?? [] }));
       setRosters(normalized.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
+      setAllUsers(users);
       setLoading(false);
 
-      const allIds = Array.from(new Set(data.flatMap(r => r.memberIds)));
-      const names: Record<string, string> = {};
-      await Promise.all(allIds.map(async id => {
-        try {
-          const u = await getUser(id);
-          if (u) names[id] = u.name as string;
-        } catch {
-          // 名簿に残っているが削除済みのユーザーはスキップ
-        }
-      }));
-      setMemberNames(names);
+      const userMap: Record<string, string> = {};
+      users.forEach(u => { userMap[u.memberId] = u.name; });
+      setMemberNames(userMap);
     } catch (e) {
       console.error('名簿の読み込みに失敗しました', e);
       setLoading(false);
@@ -74,19 +68,14 @@ export default function NumbersPage() {
     load();
   };
 
-  const handleAddMember = async (rosterId: string, currentIds: string[]) => {
-    const id = memberInput.trim().replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
-    if (!id) return;
-    if (currentIds.includes(id)) { setMemberInputError('すでに追加されています'); return; }
+  const handleAddMember = async (rosterId: string, currentIds: string[], m: { id: string; name: string }) => {
+    if (currentIds.includes(m.id)) { setMemberInputError('すでに追加されています'); return; }
     setMemberInputLoading(true);
     setMemberInputError('');
     try {
-      const user = await getUser(id);
-      if (!user) { setMemberInputError('会員番号が見つかりません'); return; }
-      const newIds = [...currentIds, id];
+      const newIds = [...currentIds, m.id];
       await updateNumberRoster(rosterId, { memberIds: newIds });
-      setMemberNames(prev => ({ ...prev, [id]: user.name as string }));
-      setMemberInput('');
+      setMemberNames(prev => ({ ...prev, [m.id]: m.name }));
       setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, memberIds: newIds } : r));
     } catch (e: any) {
       setMemberInputError(`登録に失敗しました: ${e?.message || e}`);
@@ -130,12 +119,12 @@ export default function NumbersPage() {
 
     const unique = Array.from(new Set(tokens));
 
-    const results = await Promise.all(
-      unique.map(async id => {
-        const u = await getUser(id);
-        return { id, name: u?.name as string ?? '', found: !!u };
-      })
-    );
+    const userMap = new Map(allUsers.map(u => [u.memberId, u.name]));
+    const results = unique.map(id => ({
+      id,
+      name: userMap.get(id) ?? '',
+      found: userMap.has(id),
+    }));
     setCsvPreview(results);
     setCsvParsing(false);
   };
@@ -167,23 +156,6 @@ export default function NumbersPage() {
     setCsvPreview([]);
   };
 
-  const handlePasteMember = (
-    e: React.ClipboardEvent<HTMLInputElement>,
-    rosterId: string,
-  ) => {
-    const text = e.clipboardData.getData('text');
-    const ids = Array.from(new Set(
-      text.split(/[\n\r]/)
-        .flatMap(line => line.split(/[\t,\s]+/))
-        .map(t => t.trim())
-        .filter(t => /^\d{4,6}$/.test(t))
-    ));
-    if (ids.length <= 1) return; // 1件以下は通常入力に任せる
-    e.preventDefault();
-    setCsvMode(rosterId);
-    setCsvText(text);
-    parseCsvText(text);
-  };
 
   if (loading) {
     return (
@@ -264,7 +236,7 @@ export default function NumbersPage() {
                     <button
                       onClick={() => {
                         setExpandedId(isExpanded ? null : roster.id);
-                        setMemberInput(''); setMemberInputError('');
+                        setMemberInputError('');
                         if (isCsvOpen) { setCsvMode(null); setCsvText(''); setCsvPreview([]); }
                       }}
                       className="text-xs px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-white/50 rounded-lg transition-colors"
@@ -303,24 +275,14 @@ export default function NumbersPage() {
                     {/* 1件ずつ追加 */}
                     {!isCsvOpen && (
                       <div>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="会員番号（1件 or 複数行ペースト可）"
-                            value={memberInput}
-                            onChange={e => { setMemberInput(e.target.value); setMemberInputError(''); }}
-                            onKeyDown={e => e.key === 'Enter' && handleAddMember(roster.id, roster.memberIds)}
-                            onPaste={e => handlePasteMember(e, roster.id)}
-                            className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/20 focus:outline-none"
-                          />
-                          <button
-                            onClick={() => handleAddMember(roster.id, roster.memberIds)}
-                            disabled={memberInputLoading || !memberInput.trim()}
-                            className="text-xs px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 disabled:opacity-40 transition-colors"
-                          >
-                            {memberInputLoading ? '...' : '追加'}
-                          </button>
-                        </div>
+                        <MemberSelectDropdown
+                          allUsers={allUsers.filter(u => !roster.memberIds.includes(u.memberId))}
+                          selected={[]}
+                          onAdd={m => { setMemberInputError(''); handleAddMember(roster.id, roster.memberIds, m); }}
+                          onRemove={() => {}}
+                          chipColor="green"
+                          placeholder="名前・ふりがな・会員番号で検索..."
+                        />
                         {memberInputError && <p className="text-xs text-red-400 mt-1">{memberInputError}</p>}
                       </div>
                     )}
