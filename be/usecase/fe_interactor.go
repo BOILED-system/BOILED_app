@@ -121,7 +121,9 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 // SyncPracticesFromSheet は date+name をキーに重複チェックし、last-write-wins でセッションを同期する。
 //
 // 判定ロジック:
-//   - 新規（Firestoreに存在しない）→ 作成
+//   - 新規（Firestoreに存在しない）→ 作成。同名の既存セッションがあればそのターゲット設定を継承する
+//     （シート同期は genre_generation しか送れないため、アプリで名簿型等に変更済みの
+//     プロジェクトへ追加された日程が対象者設定を引き継げるようにする）
 //   - 既存で updatedAt > sheetSyncedAt → 最後のシート同期後にアプリで編集されている → スキップ
 //   - 既存で updatedAt <= sheetSyncedAt（またはどちらも未設定）→ シートが最新 → スケジュール系フィールドを上書き
 //
@@ -134,8 +136,14 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 		return 0, err
 	}
 	existingMap := make(map[string]*domain.FEPracticeSession, len(existing))
+	// 同名プロジェクトで最後に更新されたセッション（新規作成時のターゲット設定の継承元）
+	latestByName := make(map[string]*domain.FEPracticeSession, len(existing))
 	for _, s := range existing {
 		existingMap[s.Date+"_"+s.Name] = s
+		cur, ok := latestByName[s.Name]
+		if !ok || (s.UpdatedAt != nil && (cur.UpdatedAt == nil || s.UpdatedAt.After(*cur.UpdatedAt))) {
+			latestByName[s.Name] = s
+		}
 	}
 
 	now := time.Now()
@@ -143,6 +151,15 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 	for _, s := range sessions {
 		old, dup := existingMap[s.Date+"_"+s.Name]
 		if !dup {
+			// 同名プロジェクトの既存セッションからターゲット設定を継承する。
+			// additionalMemberIds/excludedMemberIds は日程ごとの個別調整なので継承しない。
+			if sib, ok := latestByName[s.Name]; ok && sib.TargetType != "" {
+				s.TargetType = sib.TargetType
+				s.TargetGenres = sib.TargetGenres
+				s.TargetGenerations = sib.TargetGenerations
+				s.TargetNumberID = sib.TargetNumberID
+				s.TargetMemberIDs = sib.TargetMemberIDs
+			}
 			s.UpdatedAt = &now
 			s.SheetSyncedAt = &now
 			if err := i.sessionRepo.Create(ctx, s); err != nil {
