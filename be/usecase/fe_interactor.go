@@ -118,7 +118,18 @@ func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) err
 	return i.sessionRepo.Delete(ctx, id)
 }
 
-// SyncPracticesFromSheet は date+name をキーに重複チェックし、last-write-wins でセッションを同期する。
+// syncKey はシート同期の重複判定キー。
+// 同じ日に通常練と深夜練が両方あるケース（例: 日曜練 + その夜の深夜練）を
+// 別セッションとして扱えるよう、isOvernight を含める。
+func syncKey(s *domain.FEPracticeSession) string {
+	k := s.Date + "_" + s.Name
+	if s.IsOvernight {
+		k += "_night"
+	}
+	return k
+}
+
+// SyncPracticesFromSheet は date+name+isOvernight をキーに重複チェックし、last-write-wins でセッションを同期する。
 //
 // 判定ロジック:
 //   - 新規（Firestoreに存在しない）→ 作成。同名の既存セッションがあればそのターゲット設定を継承する
@@ -139,7 +150,7 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 	// 同名プロジェクトで最後に更新されたセッション（新規作成時のターゲット設定の継承元）
 	latestByName := make(map[string]*domain.FEPracticeSession, len(existing))
 	for _, s := range existing {
-		existingMap[s.Date+"_"+s.Name] = s
+		existingMap[syncKey(s)] = s
 		cur, ok := latestByName[s.Name]
 		if !ok || (s.UpdatedAt != nil && (cur.UpdatedAt == nil || s.UpdatedAt.After(*cur.UpdatedAt))) {
 			latestByName[s.Name] = s
@@ -149,7 +160,7 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 	now := time.Now()
 	created := 0
 	for _, s := range sessions {
-		old, dup := existingMap[s.Date+"_"+s.Name]
+		old, dup := existingMap[syncKey(s)]
 		if !dup {
 			// 同名プロジェクトの既存セッションからターゲット設定を継承する。
 			// additionalMemberIds/excludedMemberIds は日程ごとの個別調整なので継承しない。
