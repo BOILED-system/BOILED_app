@@ -42,6 +42,17 @@ type FEPracticeSession struct {
 	SheetSyncedAt *time.Time `json:"sheetSyncedAt,omitempty" firestore:"sheetSyncedAt,omitempty"`
 }
 
+// SheetSyncConflict はシート同期が「アプリ編集済み保護」で上書きできなかった
+// スケジュール項目の食い違い（アプリ側とシート側の値の差分）を表す。
+type SheetSyncConflict struct {
+	SessionName string
+	Date        string
+	IsOvernight bool
+	Field       string // 例: "場所", "開始時間"
+	AppValue    string
+	SheetValue  string
+}
+
 // FEPracticeRSVP represents a practice attendance record matching frontend schema.
 type FEPracticeRSVP struct {
 	MemberID   string `json:"memberId" firestore:"memberId"`

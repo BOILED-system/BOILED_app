@@ -171,6 +171,103 @@ func TestSyncPracticesFromSheet_OvernightCoexistsWithSameDaySession(t *testing.T
 	}
 }
 
+func TestScheduleConflicts(t *testing.T) {
+	old := &domain.FEPracticeSession{
+		Name: "夏イベ期Waack", Date: "2099-08-06", IsOvernight: true,
+		StartTime: "9:00", EndTime: "11:00", Location: "桜丘レンタルスタジオ", Type: "event",
+	}
+	// 表記ゆれ("09:00" vs "9:00")は差分にしない
+	same := &domain.FEPracticeSession{
+		Name: "夏イベ期Waack", Date: "2099-08-06", IsOvernight: true,
+		StartTime: "09:00", EndTime: "11:00", Location: " 桜丘レンタルスタジオ ", Type: "event",
+	}
+	if got := scheduleConflicts(old, same); len(got) != 0 {
+		t.Errorf("normalized-equal sessions should have no conflicts: %+v", got)
+	}
+
+	diff := &domain.FEPracticeSession{
+		Name: "夏イベ期Waack", Date: "2099-08-06", IsOvernight: true,
+		StartTime: "10:00", EndTime: "11:00", Location: "ワークル大久保302", Type: "event",
+	}
+	got := scheduleConflicts(old, diff)
+	if len(got) != 2 {
+		t.Fatalf("want 2 conflicts (場所+開始時間), got %d: %+v", len(got), got)
+	}
+	if got[0].Field != "場所" || got[0].AppValue != "桜丘レンタルスタジオ" || got[0].SheetValue != "ワークル大久保302" {
+		t.Errorf("unexpected location conflict: %+v", got[0])
+	}
+	if got[1].Field != "開始時間" || !got[1].IsOvernight {
+		t.Errorf("unexpected start-time conflict: %+v", got[1])
+	}
+}
+
+func TestSyncPracticesFromSheet_CollectsConflictsForProtectedSessions(t *testing.T) {
+	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	edited := synced.Add(time.Hour)
+	repo := &fakeSessionRepo{
+		sessions: []*domain.FEPracticeSession{
+			{ // 未来日・アプリ編集済み・シートと場所が食い違う → 通知対象
+				ID: "s1", Name: "夏イベ期Waack", Date: "2099-08-06", IsOvernight: true,
+				Location: "桜丘レンタルスタジオ",
+				UpdatedAt: tp(edited), SheetSyncedAt: tp(synced),
+			},
+			{ // 過去日 → 食い違っていても通知しない
+				ID: "s2", Name: "夏イベ期Waack", Date: "2000-01-01",
+				Location: "旧スタジオ",
+				UpdatedAt: tp(edited), SheetSyncedAt: tp(synced),
+			},
+		},
+	}
+	i := newTestInteractor(repo)
+
+	_, conflicts, err := i.syncPracticesFromSheet(context.Background(), []*domain.FEPracticeSession{
+		{Name: "夏イベ期Waack", Date: "2099-08-06", IsOvernight: true, Location: "ワークル大久保302"},
+		{Name: "夏イベ期Waack", Date: "2000-01-01", Location: "別スタジオ"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conflicts) != 1 {
+		t.Fatalf("want 1 conflict, got %d: %+v", len(conflicts), conflicts)
+	}
+	c := conflicts[0]
+	if c.SessionName != "夏イベ期Waack" || c.Date != "2099-08-06" || c.Field != "場所" ||
+		c.AppValue != "桜丘レンタルスタジオ" || c.SheetValue != "ワークル大久保302" {
+		t.Errorf("unexpected conflict: %+v", c)
+	}
+	// 保護されたセッションは上書きされないこと
+	if len(repo.updated) != 0 {
+		t.Errorf("protected sessions must not be updated: %v", repo.updated)
+	}
+}
+
+func TestSyncPracticesFromSheet_NoConflictWhenSheetWins(t *testing.T) {
+	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	repo := &fakeSessionRepo{
+		sessions: []*domain.FEPracticeSession{
+			{ // 保護されていない（updatedAt == sheetSyncedAt）→ 普通に上書きされ通知なし
+				ID: "s1", Name: "夏イベ期Waack", Date: "2099-08-06",
+				Location:  "旧スタジオ",
+				UpdatedAt: tp(synced), SheetSyncedAt: tp(synced),
+			},
+		},
+	}
+	i := newTestInteractor(repo)
+
+	_, conflicts, err := i.syncPracticesFromSheet(context.Background(), []*domain.FEPracticeSession{
+		{Name: "夏イベ期Waack", Date: "2099-08-06", Location: "新スタジオ"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conflicts) != 0 {
+		t.Errorf("overwritten session must not be reported as conflict: %+v", conflicts)
+	}
+	if len(repo.updated) != 1 {
+		t.Errorf("unprotected session should be updated: %v", repo.updated)
+	}
+}
+
 func TestSyncPracticesFromSheet_SkipsAppEditedSession(t *testing.T) {
 	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	edited := synced.Add(time.Hour)
