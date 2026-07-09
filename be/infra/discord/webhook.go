@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/noa/circle-app/api/domain"
 )
@@ -86,7 +87,8 @@ func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, oldRSVP,
 }
 
 // NotifySyncConflicts はシート同期がアプリ編集済み保護で反映できなかった
-// スケジュール項目の食い違いを1通のダイジェストとしてDiscordに送る。
+// スケジュール項目の食い違いをダイジェストとしてDiscordに送る。
+// 全件を省略せず、2000文字制限を超える場合は複数メッセージに分割する。
 // 宛先は DISCORD_WEBHOOK_SYNC、未設定なら DISCORD_WEBHOOK_ALL にフォールバック。
 func NotifySyncConflicts(ctx context.Context, conflicts []domain.SheetSyncConflict) {
 	if len(conflicts) == 0 {
@@ -100,8 +102,6 @@ func NotifySyncConflicts(ctx context.Context, conflicts []domain.SheetSyncConfli
 		return
 	}
 
-	// Discordのメッセージ上限(2000文字)に収まるよう件数を制限
-	const maxLines = 15
 	orEmpty := func(v string) string {
 		if strings.TrimSpace(v) == "" {
 			return "（未設定）"
@@ -109,23 +109,82 @@ func NotifySyncConflicts(ctx context.Context, conflicts []domain.SheetSyncConfli
 		return v
 	}
 
-	var b strings.Builder
-	fmt.Fprintf(&b, "⚠️ **[シート同期] アプリ編集済みのため反映できない変更が %d 件あります**\n", len(conflicts))
-	b.WriteString("アプリで編集済みのセッションはスプシから上書きされません。スプシの内容が正しい場合はアプリ側を手動で修正してください。\n")
-	for i, c := range conflicts {
-		if i >= maxLines {
-			fmt.Fprintf(&b, "…他 %d 件\n", len(conflicts)-maxLines)
-			break
+	// DISCORD_SYNC_MENTION_ROLE_IDS（カンマ区切りのロールID）が設定されていれば
+	// 先頭メッセージでそのロール（幹部・ジャンルリーダー等）にメンションする。
+	var mentionRoleIDs []string
+	mention := ""
+	if ids := os.Getenv("DISCORD_SYNC_MENTION_ROLE_IDS"); ids != "" {
+		for _, id := range strings.Split(ids, ",") {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			mentionRoleIDs = append(mentionRoleIDs, id)
+			mention += fmt.Sprintf("<@&%s> ", id)
 		}
+	}
+
+	header := fmt.Sprintf(
+		"%s⚠️ **[シート同期] アプリ編集済みのため反映できない変更が %d 件あります**\n"+
+			"アプリで編集済みのセッションはスプシから上書きされません。スプシの内容が正しい場合はアプリ側を手動で修正してください。\n",
+		mention, len(conflicts))
+
+	lines := make([]string, 0, len(conflicts))
+	for _, c := range conflicts {
 		night := ""
 		if c.IsOvernight {
 			night = " 深夜"
 		}
-		fmt.Fprintf(&b, "• %s %s%s — %s: アプリ「%s」⇔ スプシ「%s」\n",
-			c.SessionName, c.Date, night, c.Field, orEmpty(c.AppValue), orEmpty(c.SheetValue))
+		lines = append(lines, fmt.Sprintf("• %s %s%s — %s: アプリ「%s」⇔ スプシ「%s」\n",
+			c.SessionName, c.Date, night, c.Field, orEmpty(c.AppValue), orEmpty(c.SheetValue)))
 	}
 
-	payload := map[string]string{"content": b.String()}
+	for i, msg := range chunkMessages(header, lines, 1900) {
+		// メンションのping（allowed_mentions）は先頭メッセージのみ
+		if i == 0 {
+			postWebhookWithMentions(ctx, webhookURL, msg, mentionRoleIDs)
+		} else {
+			postWebhook(ctx, webhookURL, msg)
+		}
+	}
+}
+
+// chunkMessages はheader+linesをDiscordの1メッセージ上限(limit文字)に収まるよう
+// 複数メッセージに分割する。2通目以降は「（続き）」で始まる。
+func chunkMessages(header string, lines []string, limit int) []string {
+	var messages []string
+	var b strings.Builder
+	b.WriteString(header)
+	count := utf8.RuneCountInString(header)
+	for _, line := range lines {
+		n := utf8.RuneCountInString(line)
+		if count+n > limit {
+			messages = append(messages, b.String())
+			b.Reset()
+			b.WriteString("（続き）\n")
+			count = utf8.RuneCountInString("（続き）\n")
+		}
+		b.WriteString(line)
+		count += n
+	}
+	if b.Len() > 0 {
+		messages = append(messages, b.String())
+	}
+	return messages
+}
+
+func postWebhook(ctx context.Context, webhookURL, content string) {
+	postWebhookWithMentions(ctx, webhookURL, content, nil)
+}
+
+// postWebhookWithMentions はロールメンションのpingを許可してWebhookに投稿する。
+// Discordはmentionable設定されていないロールを<@&id>で書いてもpingしないため、
+// allowed_mentions.roles に明示することで確実に通知を飛ばす。
+func postWebhookWithMentions(ctx context.Context, webhookURL, content string, roleIDs []string) {
+	payload := map[string]interface{}{"content": content}
+	if len(roleIDs) > 0 {
+		payload["allowed_mentions"] = map[string]interface{}{"roles": roleIDs}
+	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(payloadBytes))
