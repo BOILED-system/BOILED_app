@@ -127,6 +127,50 @@ func TestSyncPracticesFromSheet_NoInheritFromEmptyTargetType(t *testing.T) {
 	}
 }
 
+func TestSyncPracticesFromSheet_OvernightCoexistsWithSameDaySession(t *testing.T) {
+	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	edited := synced.Add(time.Hour)
+	repo := &fakeSessionRepo{
+		sessions: []*domain.FEPracticeSession{
+			// 同じ日に通常練（日曜練）が既に存在し、アプリで編集済み
+			{
+				ID: "s1", Name: "夏イベ期下級Hiphop2", Date: "2026-09-06",
+				StartTime: "19:45", EndTime: "22:00", Location: "花伝舎B3",
+				TargetType: "number", TargetNumberID: "roster-hip2",
+				UpdatedAt: tp(edited), SheetSyncedAt: tp(synced),
+			},
+		},
+	}
+	i := newTestInteractor(repo)
+
+	// 同日の深夜練は別セッションとして新規作成されること
+	created, err := i.SyncPracticesFromSheet(context.Background(), []*domain.FEPracticeSession{
+		{
+			Name: "夏イベ期下級Hiphop2", Date: "2026-09-06", EndDate: "2026-09-07",
+			IsOvernight: true, Location: "ワークル大久保201",
+			TargetType: "genre_generation", TargetGenres: []string{"下級Hiphop2"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created != 1 || len(repo.created) != 1 {
+		t.Fatalf("overnight session must be created alongside same-day session: created=%d", created)
+	}
+	got := repo.created[0]
+	if !got.IsOvernight || got.EndDate != "2026-09-07" {
+		t.Errorf("created session should be overnight: %+v", got)
+	}
+	// ターゲット設定は同名セッションから継承されること
+	if got.TargetType != "number" || got.TargetNumberID != "roster-hip2" {
+		t.Errorf("should inherit number targeting: type=%q numberId=%q", got.TargetType, got.TargetNumberID)
+	}
+	// 既存の通常練は触られないこと
+	if len(repo.updated) != 0 {
+		t.Errorf("existing same-day session must not be updated: %v", repo.updated)
+	}
+}
+
 func TestSyncPracticesFromSheet_SkipsAppEditedSession(t *testing.T) {
 	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	edited := synced.Add(time.Hour)
