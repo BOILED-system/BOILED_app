@@ -147,6 +147,26 @@ func normalizeTimeStr(t string) string {
 	return fmt.Sprintf("%d:%02d", h, m)
 }
 
+// normalizeLocationStr は場所の表記ゆれを吸収して比較用に正規化する。
+// スペースの有無・大文字小文字・スタジオ名の別名（GAS側 STUDIO_NAME_NORMALIZE と同等）を
+// 同一視し、実質同じ場所を食い違いとして通知しないようにする。
+func normalizeLocationStr(s string) string {
+	s = strings.ToLower(s)
+	s = strings.NewReplacer(" ", "", "　", "").Replace(s)
+	// 別名の統一（長い別名から先に置換する）
+	for _, r := range []struct{ from, to string }{
+		{"studioworcle", "ワークル"},
+		{"worcle", "ワークル"},
+		{"スタジオよもだ", "よもだ"},
+		{"ヨモダ", "よもだ"},
+		{"yomoda", "よもだ"},
+		{"バズ", "buzz"},
+	} {
+		s = strings.ReplaceAll(s, r.from, r.to)
+	}
+	return s
+}
+
 // scheduleConflicts はアプリ編集済み保護で上書きできないセッションについて、
 // アプリ側(old)とシート側(sheet)のスケジュール項目の差分を返す。
 func scheduleConflicts(old, sheet *domain.FEPracticeSession) []domain.SheetSyncConflict {
@@ -161,7 +181,7 @@ func scheduleConflicts(old, sheet *domain.FEPracticeSession) []domain.SheetSyncC
 			SheetValue:  sheetVal,
 		})
 	}
-	if strings.TrimSpace(old.Location) != strings.TrimSpace(sheet.Location) {
+	if normalizeLocationStr(old.Location) != normalizeLocationStr(sheet.Location) {
 		add("場所", old.Location, sheet.Location)
 	}
 	if normalizeTimeStr(old.StartTime) != normalizeTimeStr(sheet.StartTime) {

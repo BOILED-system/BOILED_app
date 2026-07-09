@@ -201,6 +201,42 @@ func TestScheduleConflicts(t *testing.T) {
 	}
 }
 
+func TestNormalizeLocationStr(t *testing.T) {
+	// 実際の通知に出ていた表記ゆれノイズ：正規化後は同一視されること
+	same := [][2]string{
+		{"マイスタ 5B", "マイスタ5B"},
+		{"studio worcle 代々木 601", "ワークル代々木601"},
+		{"スタジオよもだ B4", "よもだB4"},
+		{"BUZZ渋谷TOWER 4-2st", "buzz渋谷TOWER 4-2st"},
+		{"worcle大久保101", "ワークル大久保101"},
+	}
+	for _, p := range same {
+		if normalizeLocationStr(p[0]) != normalizeLocationStr(p[1]) {
+			t.Errorf("%q and %q should normalize to the same value: %q vs %q",
+				p[0], p[1], normalizeLocationStr(p[0]), normalizeLocationStr(p[1]))
+		}
+	}
+	// 本当に違う場所は区別されること
+	diff := [][2]string{
+		{"桜丘レンタルスタジオ", "ワークル大久保302"},
+		{"ワークル大久保201", "ワークル大久保301"},
+		{"マイスタ 5A", "マイスタ4A20-22"},
+	}
+	for _, p := range diff {
+		if normalizeLocationStr(p[0]) == normalizeLocationStr(p[1]) {
+			t.Errorf("%q and %q must remain different", p[0], p[1])
+		}
+	}
+}
+
+func TestScheduleConflicts_IgnoresLocationNotationNoise(t *testing.T) {
+	old := &domain.FEPracticeSession{Name: "夏イベ期Waack", Date: "2099-08-09", Location: "studio worcle 代々木 601", StartTime: "20:00", EndTime: "22:00"}
+	sheet := &domain.FEPracticeSession{Name: "夏イベ期Waack", Date: "2099-08-09", Location: "ワークル代々木601", StartTime: "20:00", EndTime: "22:00"}
+	if got := scheduleConflicts(old, sheet); len(got) != 0 {
+		t.Errorf("notation-only location difference should not be a conflict: %+v", got)
+	}
+}
+
 func TestSyncPracticesFromSheet_CollectsConflictsForProtectedSessions(t *testing.T) {
 	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	edited := synced.Add(time.Hour)
