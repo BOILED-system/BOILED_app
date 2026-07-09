@@ -85,6 +85,60 @@ func NotifyRSVP(ctx context.Context, session *domain.FEPracticeSession, oldRSVP,
 	}
 }
 
+// NotifySyncConflicts はシート同期がアプリ編集済み保護で反映できなかった
+// スケジュール項目の食い違いを1通のダイジェストとしてDiscordに送る。
+// 宛先は DISCORD_WEBHOOK_SYNC、未設定なら DISCORD_WEBHOOK_ALL にフォールバック。
+func NotifySyncConflicts(ctx context.Context, conflicts []domain.SheetSyncConflict) {
+	if len(conflicts) == 0 {
+		return
+	}
+	webhookURL := os.Getenv("DISCORD_WEBHOOK_SYNC")
+	if webhookURL == "" {
+		webhookURL = os.Getenv("DISCORD_WEBHOOK_ALL")
+	}
+	if webhookURL == "" {
+		return
+	}
+
+	// Discordのメッセージ上限(2000文字)に収まるよう件数を制限
+	const maxLines = 15
+	orEmpty := func(v string) string {
+		if strings.TrimSpace(v) == "" {
+			return "（未設定）"
+		}
+		return v
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "⚠️ **[シート同期] アプリ編集済みのため反映できない変更が %d 件あります**\n", len(conflicts))
+	b.WriteString("アプリで編集済みのセッションはスプシから上書きされません。スプシの内容が正しい場合はアプリ側を手動で修正してください。\n")
+	for i, c := range conflicts {
+		if i >= maxLines {
+			fmt.Fprintf(&b, "…他 %d 件\n", len(conflicts)-maxLines)
+			break
+		}
+		night := ""
+		if c.IsOvernight {
+			night = " 深夜"
+		}
+		fmt.Fprintf(&b, "• %s %s%s — %s: アプリ「%s」⇔ スプシ「%s」\n",
+			c.SessionName, c.Date, night, c.Field, orEmpty(c.AppValue), orEmpty(c.SheetValue))
+	}
+
+	payload := map[string]string{"content": b.String()}
+	payloadBytes, _ := json.Marshal(payload)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{}).Do(req)
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
 // getWebhookURLs determines which URLs to send to based on genres and environment variables
 func getWebhookURLs(genres []string) []string {
 	urlsMap := make(map[string]bool)

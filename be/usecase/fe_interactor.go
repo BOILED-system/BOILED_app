@@ -2,6 +2,9 @@ package usecase
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/noa/circle-app/api/domain"
@@ -129,22 +132,89 @@ func syncKey(s *domain.FEPracticeSession) string {
 	return k
 }
 
+// normalizeTimeStr は "9:00" と "09:00" のような表記ゆれを吸収して比較用に正規化する。
+func normalizeTimeStr(t string) string {
+	t = strings.TrimSpace(t)
+	parts := strings.Split(t, ":")
+	if len(parts) != 2 {
+		return t
+	}
+	h, err1 := strconv.Atoi(parts[0])
+	m, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return t
+	}
+	return fmt.Sprintf("%d:%02d", h, m)
+}
+
+// scheduleConflicts はアプリ編集済み保護で上書きできないセッションについて、
+// アプリ側(old)とシート側(sheet)のスケジュール項目の差分を返す。
+func scheduleConflicts(old, sheet *domain.FEPracticeSession) []domain.SheetSyncConflict {
+	var out []domain.SheetSyncConflict
+	add := func(field, appVal, sheetVal string) {
+		out = append(out, domain.SheetSyncConflict{
+			SessionName: old.Name,
+			Date:        old.Date,
+			IsOvernight: old.IsOvernight,
+			Field:       field,
+			AppValue:    appVal,
+			SheetValue:  sheetVal,
+		})
+	}
+	if strings.TrimSpace(old.Location) != strings.TrimSpace(sheet.Location) {
+		add("場所", old.Location, sheet.Location)
+	}
+	if normalizeTimeStr(old.StartTime) != normalizeTimeStr(sheet.StartTime) {
+		add("開始時間", old.StartTime, sheet.StartTime)
+	}
+	if normalizeTimeStr(old.EndTime) != normalizeTimeStr(sheet.EndTime) {
+		add("終了時間", old.EndTime, sheet.EndTime)
+	}
+	if old.EndDate != sheet.EndDate {
+		add("終了日", old.EndDate, sheet.EndDate)
+	}
+	if old.Type != sheet.Type {
+		add("種別", old.Type, sheet.Type)
+	}
+	return out
+}
+
+// jstToday は JST での今日の日付("2006-01-02")を返す。
+func jstToday() string {
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil || loc == nil {
+		loc = time.FixedZone("JST", 9*60*60)
+	}
+	return time.Now().In(loc).Format("2006-01-02")
+}
+
 // SyncPracticesFromSheet は date+name+isOvernight をキーに重複チェックし、last-write-wins でセッションを同期する。
+// アプリ編集済み保護でシートの変更を反映できなかったセッションがあれば Discord に通知する。
+func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
+	created, conflicts, err := i.syncPracticesFromSheet(ctx, sessions)
+	if len(conflicts) > 0 {
+		go discord.NotifySyncConflicts(context.Background(), conflicts)
+	}
+	return created, err
+}
+
+// syncPracticesFromSheet は同期の本体。
 //
 // 判定ロジック:
 //   - 新規（Firestoreに存在しない）→ 作成。同名の既存セッションがあればそのターゲット設定を継承する
 //     （シート同期は genre_generation しか送れないため、アプリで名簿型等に変更済みの
 //     プロジェクトへ追加された日程が対象者設定を引き継げるようにする）
-//   - 既存で updatedAt > sheetSyncedAt → 最後のシート同期後にアプリで編集されている → スキップ
+//   - 既存で updatedAt > sheetSyncedAt → 最後のシート同期後にアプリで編集されている → スキップ。
+//     ただし今日以降のセッションでシートとスケジュール項目が食い違う場合は通知対象として収集する
 //   - 既存で updatedAt <= sheetSyncedAt（またはどちらも未設定）→ シートが最新 → スケジュール系フィールドを上書き
 //
 // 上書き対象フィールド: date/startTime/endTime/endDate/isOvernight/location/type/targetGenres
 // 保護するフィールド: note/targetType/targetMemberIds/additionalMemberIds/excludedMemberIds など
-// 戻り値は作成件数と更新件数。
-func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, error) {
+// 戻り値は作成件数・食い違い一覧。
+func (i *FEInteractor) syncPracticesFromSheet(ctx context.Context, sessions []*domain.FEPracticeSession) (int, []domain.SheetSyncConflict, error) {
 	existing, err := i.sessionRepo.GetAll(ctx)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	existingMap := make(map[string]*domain.FEPracticeSession, len(existing))
 	// 同名プロジェクトで最後に更新されたセッション（新規作成時のターゲット設定の継承元）
@@ -158,7 +228,9 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 	}
 
 	now := time.Now()
+	today := jstToday()
 	created := 0
+	var conflicts []domain.SheetSyncConflict
 	for _, s := range sessions {
 		old, dup := existingMap[syncKey(s)]
 		if !dup {
@@ -174,14 +246,18 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 			s.UpdatedAt = &now
 			s.SheetSyncedAt = &now
 			if err := i.sessionRepo.Create(ctx, s); err != nil {
-				return created, err
+				return created, conflicts, err
 			}
 			created++
 			continue
 		}
 
-		// last-write-wins: アプリが最後のシート同期より後に編集していたらスキップ
+		// last-write-wins: アプリが最後のシート同期より後に編集していたらスキップ。
+		// ただし今日以降のセッションでシートと食い違っている場合は通知対象として収集する。
 		if old.UpdatedAt != nil && old.SheetSyncedAt != nil && old.UpdatedAt.After(*old.SheetSyncedAt) {
+			if s.Date >= today {
+				conflicts = append(conflicts, scheduleConflicts(old, s)...)
+			}
 			continue
 		}
 
@@ -198,10 +274,10 @@ func (i *FEInteractor) SyncPracticesFromSheet(ctx context.Context, sessions []*d
 			"sheetSyncedAt": now,
 		}
 		if err := i.sessionRepo.Update(ctx, old.ID, updates); err != nil {
-			return created, err
+			return created, conflicts, err
 		}
 	}
-	return created, nil
+	return created, conflicts, nil
 }
 
 // ===== Practice RSVPs =====
