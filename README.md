@@ -2,7 +2,7 @@
 
 BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理・イベント情報・精算・カレンダー連携などをまとめて扱える。
 
-**本番URL**: https://boiled-app.vercel.app
+**本番URL**: https://boiled-app-eight.vercel.app
 
 ---
 
@@ -315,7 +315,7 @@ Vercelに設定が必要な環境変数:
 ```json
 [
   {
-    "origin": ["https://boiled-app.vercel.app", "http://localhost:3000"],
+    "origin": ["https://boiled-app-eight.vercel.app", "http://localhost:3000"],
     "method": ["GET", "PUT", "POST", "DELETE"],
     "maxAgeSeconds": 3600
   }
