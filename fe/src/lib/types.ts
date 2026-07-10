@@ -44,6 +44,7 @@ export interface PracticeSession {
   targetMemberIds: string[];
   additionalMemberIds: string[];
   excludedMemberIds: string[];
+  choreoMemberIds?: string[];
   createdBy?: string;
   createdByName?: string;
   createdAt: any;

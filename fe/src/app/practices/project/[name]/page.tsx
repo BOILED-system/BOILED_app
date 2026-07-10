@@ -85,6 +85,11 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
   const [projectExcluded, setProjectExcluded] = useState<{ id: string; name: string }[]>([]);
   const [projectSaving, setProjectSaving] = useState(false);
 
+  // コレオ登録ステート（プロジェクト単位・全日程に複製保存）
+  const [showChoreo, setShowChoreo] = useState(false);
+  const [choreoMembers, setChoreoMembers] = useState<{ id: string; name: string }[]>([]);
+  const [choreoSaving, setChoreoSaving] = useState(false);
+
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'member';
     const mid = localStorage.getItem('memberId') || '';
@@ -327,6 +332,31 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
     }
   };
 
+  const openChoreo = () => {
+    const toMember = (id: string) => {
+      const u = allUsers.find(u => u.memberId === id);
+      return { id, name: u?.name || id };
+    };
+    const ids = Array.from(new Set(groupSessions.flatMap(s => s.choreoMemberIds || [])));
+    setChoreoMembers(ids.map(toMember));
+    setShowChoreo(true);
+  };
+
+  const handleSaveChoreo = async () => {
+    setChoreoSaving(true);
+    try {
+      const choreoMemberIds = choreoMembers.map(m => m.id);
+      await Promise.all(groupSessions.map(s => updatePracticeSession(s.id, { choreoMemberIds })));
+      setGroupSessions(prev => prev.map(s => ({ ...s, choreoMemberIds })));
+      setShowChoreo(false);
+    } catch (e: any) {
+      console.error('[handleSaveChoreo]', e);
+      alert(`保存に失敗しました: ${e?.message || e}`);
+    } finally {
+      setChoreoSaving(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin"/></div>;
   }
@@ -377,6 +407,9 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
             </button>
             <button onClick={openProjectMembers} className="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
               対象者を編集
+            </button>
+            <button onClick={openChoreo} className="text-xs bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 transition-colors px-2.5 py-1 rounded-lg whitespace-nowrap">
+              コレオ登録
             </button>
             <button onClick={handleDeleteProject} className="text-xs text-red-400/60 hover:text-red-400 transition-colors px-2 py-1 whitespace-nowrap">
               プロジェクトを削除
@@ -775,6 +808,41 @@ export default function ProjectRSVPPage({ params }: { params: { name: string } }
               <button onClick={handleSaveProjectMembers} disabled={projectSaving}
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-xl">
                 {projectSaving ? '保存中...' : '全日程に反映して保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* コレオ登録モーダル */}
+      {showChoreo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowChoreo(false)} />
+          <div className="relative w-full max-w-lg bg-[#1a1f2e] border border-white/[0.08] rounded-2xl p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white">コレオ登録</h2>
+              <button type="button" onClick={() => setShowChoreo(false)} aria-label="閉じる"
+                className="text-white/30 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-lg">×</button>
+            </div>
+            <p className="text-[11px] text-white/40">登録したメンバーは出欠一覧の<strong className="text-white/70">一番上</strong>に表示されます。この設定はプロジェクトの<strong className="text-white/70">全日程</strong>に反映されます。</p>
+
+            <MemberSelectDropdown
+              allUsers={allUsers}
+              selected={choreoMembers}
+              onAdd={m => setChoreoMembers(prev => [...prev, m])}
+              onRemove={id => setChoreoMembers(prev => prev.filter(m => m.id !== id))}
+              chipColor="green"
+              placeholder="コレオ登録するメンバーを選択..."
+            />
+
+            <div className="flex gap-2 pt-4 border-t border-white/[0.08]">
+              <button onClick={() => setShowChoreo(false)}
+                className="flex-1 py-2.5 text-sm text-white/40 hover:text-white/60 bg-white/[0.04] rounded-xl">
+                キャンセル
+              </button>
+              <button onClick={handleSaveChoreo} disabled={choreoSaving}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-fuchsia-500 hover:bg-fuchsia-600 disabled:opacity-50 rounded-xl">
+                {choreoSaving ? '保存中...' : '全日程に反映して保存'}
               </button>
             </div>
           </div>

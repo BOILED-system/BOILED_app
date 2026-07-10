@@ -32,6 +32,9 @@ type FEPracticeSession struct {
 	TargetMemberIDs      []string `json:"targetMemberIds" firestore:"targetMemberIds"`
 	AdditionalMemberIDs  []string `json:"additionalMemberIds" firestore:"additionalMemberIds"`
 	ExcludedMemberIDs    []string `json:"excludedMemberIds" firestore:"excludedMemberIds"`
+	// ChoreoMemberIDs はこのプロジェクト（同名セッション群）のコレオ登録メンバー。
+	// プロジェクト単位の設定なので、対象者設定と同様に全セッションへ複製保存される。
+	ChoreoMemberIDs      []string `json:"choreoMemberIds,omitempty" firestore:"choreoMemberIds,omitempty"`
 	CreatedBy            string   `json:"createdBy" firestore:"createdBy"`
 	CreatedByName        string   `json:"createdByName" firestore:"createdByName"`
 	CreatedAt            any      `json:"createdAt" firestore:"createdAt"`
