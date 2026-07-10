@@ -48,12 +48,23 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
       }
       setSessions(matchedSessions);
 
-      // Determine targeted users. 
+      // コレオ登録メンバー（プロジェクト単位・全セッションのunion）
+      const choreoIds = new Set(matchedSessions.flatMap(s => s.choreoMemberIds || []));
+
+      // Determine targeted users.
       // Simplest logic: if a user is targeted in ANY session of this group, they appear.
+      // コレオ登録メンバーは対象外でも必ず表示する。
       const targetedUsers = allUsers.filter(u =>
         u.genre !== 'Admin' &&
-        matchedSessions.some(s => isSessionForMember(s, u.memberId, u.genre, u.generation, rosters))
-      ).sort((a, b) => parseInt(a.memberId) - parseInt(b.memberId));
+        (choreoIds.has(u.memberId) ||
+          matchedSessions.some(s => isSessionForMember(s, u.memberId, u.genre, u.generation, rosters)))
+      ).sort((a, b) => {
+        // コレオ登録メンバーを先頭に、その中/以降は会員番号順
+        const ac = choreoIds.has(a.memberId) ? 0 : 1;
+        const bc = choreoIds.has(b.memberId) ? 0 : 1;
+        if (ac !== bc) return ac - bc;
+        return parseInt(a.memberId) - parseInt(b.memberId);
+      });
 
       setUsers(targetedUsers);
 
@@ -107,6 +118,8 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
   if (sessions.length === 0) {
     return <div className="p-8 text-center text-white/50">該当する練習が見つかりません。</div>;
   }
+
+  const choreoIds = new Set(sessions.flatMap(s => s.choreoMemberIds || []));
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 overflow-x-hidden">
@@ -171,9 +184,16 @@ export default function GroupMatrixPage({ params }: { params: { name: string } }
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {users.map(u => (
-                <tr key={u.memberId} className="hover:bg-white/[0.02] transition-colors">
+                <tr key={u.memberId} className={`hover:bg-white/[0.02] transition-colors ${choreoIds.has(u.memberId) ? 'bg-fuchsia-500/[0.06]' : ''}`}>
                   <td className="px-4 py-2 font-mono text-xs text-white/40">{u.memberId}</td>
-                  <td className="px-4 py-2 font-medium bg-[#141824] sticky left-0 z-10 border-r border-white/[0.04]">{u.name}</td>
+                  <td className="px-4 py-2 font-medium bg-[#141824] sticky left-0 z-10 border-r border-white/[0.04]">
+                    <span className="inline-flex items-center gap-1.5">
+                      {u.name}
+                      {choreoIds.has(u.memberId) && (
+                        <span className="text-[10px] font-bold text-fuchsia-400 bg-fuchsia-500/15 border border-fuchsia-500/30 px-1.5 py-0.5 rounded">コレオ</span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-4 py-2 text-xs text-white/50">{u.genre} {u.generation}代</td>
                   
                   {sessions.map(s => {
