@@ -1,7 +1,24 @@
 # env
 be/.env.local
+fe/.env.local
 
 # Firebase Emulator logs
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# OS
+.DS_Store
+
+# dependencies
+node_modules/
+
+# Go build artifacts
+be/main
+be/server
+
+# generated docs (regenerate from .adoc sources)
+docs/*.html
+
+# member data (PII)
+scripts/members.csv
