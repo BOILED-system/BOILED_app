@@ -172,19 +172,6 @@ async function apiDelete(path: string): Promise<void> {
   invalidate(...invalidationPrefixesFor(path));
 }
 
-// Clear all cached GETs. Exported so pages can force-refresh after major mutations.
-export function clearApiCache(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const key = sessionStorage.key(i);
-      if (key && key.startsWith(CACHE_PREFIX)) sessionStorage.removeItem(key);
-    }
-  } catch {
-    // ignore
-  }
-}
-
 // ===== Users =====
 
 export async function getUser(memberId: string): Promise<FEUser | null> {
@@ -242,13 +229,6 @@ export async function getPracticeSessions(): Promise<PracticeSession[]> {
   return apiGet<PracticeSession[]>('/api/practice-sessions');
 }
 
-export async function getPracticeSession(id: string): Promise<PracticeSession | null> {
-  try {
-    return await apiGet<PracticeSession>(`/api/practice-sessions/${id}`);
-  } catch {
-    return null;
-  }
-}
 
 export async function createPracticeSession(data: {
   name: string;
@@ -300,13 +280,6 @@ export async function submitRSVP(data: {
   await apiPost(`/api/practice-sessions/${sessionId}/rsvps`, rsvpData);
 }
 
-export async function getMyRSVP(sessionId: string, memberId: string): Promise<PracticeRSVP | null> {
-  try {
-    return await apiGet<PracticeRSVP | null>(`/api/practice-sessions/${sessionId}/rsvps/${memberId}`);
-  } catch {
-    return null;
-  }
-}
 
 export async function getMyRSVPs(memberId: string): Promise<Record<string, PracticeRSVP>> {
   return apiGet<Record<string, PracticeRSVP>>(`/api/members/${memberId}/rsvps`);

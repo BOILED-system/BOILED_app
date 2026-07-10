@@ -210,7 +210,7 @@ export default function AttendancePage() {
                     {userRole !== 'admin' && (
                       <div className="flex-shrink-0">
                         {myRSVP ? (
-                          <Link href={`/practices/${session.id}`}>
+                          <Link href={`/practices/project/${encodeURIComponent(session.name)}`}>
                             <span className={`text-[11px] px-2.5 py-1 rounded-lg ${STATUS_COLORS[myRSVP.status]}`}>
                               {STATUS_LABELS[myRSVP.status]}
                             </span>
