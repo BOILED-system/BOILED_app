@@ -13,7 +13,6 @@ import (
 	"github.com/noa/circle-app/api/adapter/http/router"
 	cacheRepo "github.com/noa/circle-app/api/infra/cache"
 	firestoreRepo "github.com/noa/circle-app/api/infra/firestore"
-	"github.com/noa/circle-app/api/infra/gemini"
 	"github.com/noa/circle-app/api/usecase"
 )
 
@@ -28,11 +27,6 @@ func main() {
 	if projectID == "" {
 		// Cloud Run 等のGCP環境では自動取得させる
 		projectID = firestore.DetectProjectID
-	}
-
-	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey == "" {
-		log.Println("Warning: GEMINI_API_KEY not set, AI chat will not work")
 	}
 
 	port := os.Getenv("PORT")
@@ -57,20 +51,6 @@ func main() {
 	}
 	defer firestoreClient.Close()
 
-	// Initialize repositories (infra layer) — existing
-	circleRepo := firestoreRepo.NewCircleRepository(firestoreClient)
-	membershipRepo := firestoreRepo.NewMembershipRepository(firestoreClient)
-	eventRepo := firestoreRepo.NewEventRepository(firestoreClient)
-	announcementRepo := firestoreRepo.NewAnnouncementRepository(firestoreClient)
-	rsvpRepo := firestoreRepo.NewRSVPRepository(firestoreClient)
-	settlementRepo := firestoreRepo.NewSettlementRepository(firestoreClient)
-	paymentRepo := firestoreRepo.NewPaymentRepository(firestoreClient)
-	userRepo := firestoreRepo.NewUserRepository(firestoreClient)
-	practiceCategoryRepo := firestoreRepo.NewPracticeCategoryRepository(firestoreClient)
-	practiceSeriesRepo := firestoreRepo.NewPracticeSeriesRepository(firestoreClient)
-	practiceSessionRepo := firestoreRepo.NewPracticeSessionRepository(firestoreClient)
-	practiceRSVPRepo := firestoreRepo.NewPracticeRSVPRepository(firestoreClient)
-
 	// Initialize FE-compatible repositories (infra layer)
 	cacheStore := cacheRepo.NewStore()
 	feUserRepo := cacheRepo.NewFEUserRepository(firestoreRepo.NewFEUserRepository(firestoreClient), cacheStore)
@@ -82,19 +62,6 @@ func main() {
 	fePaymentRepo := cacheRepo.NewFEPaymentRepository(firestoreRepo.NewFEPaymentRepository(firestoreClient), cacheStore)
 	feLineMessageRepo := firestoreRepo.NewFELineMessageRepository(firestoreClient)
 
-	// Initialize AI service (infra layer)
-	aiService := gemini.NewAIService(geminiAPIKey)
-
-	// Initialize interactors (usecase layer) — existing
-	circleInteractor := usecase.NewCircleInteractor(circleRepo, membershipRepo, userRepo)
-	eventInteractor := usecase.NewEventInteractor(eventRepo)
-	announcementInteractor := usecase.NewAnnouncementInteractor(announcementRepo)
-	rsvpInteractor := usecase.NewRSVPInteractor(rsvpRepo, eventRepo, settlementRepo, paymentRepo)
-	settlementInteractor := usecase.NewSettlementInteractor(settlementRepo, paymentRepo)
-	chatInteractor := usecase.NewChatInteractor(announcementRepo, eventRepo, aiService)
-	userInteractor := usecase.NewUserInteractor(userRepo)
-	practiceUseCase := usecase.NewPracticeUseCase(practiceCategoryRepo, practiceSeriesRepo, practiceSessionRepo, practiceRSVPRepo, settlementRepo)
-
 	// Initialize FE-compatible interactor (usecase layer)
 	feInteractor := usecase.NewFEInteractor(
 		feUserRepo, fePracticeSessionRepo, fePracticeRSVPRepo,
@@ -102,32 +69,14 @@ func main() {
 		feLineMessageRepo,
 	)
 
-	// Initialize handlers (adapter layer) — existing
-	circleHandler := handler.NewCircleHandler(circleInteractor)
-	eventHandler := handler.NewEventHandler(eventInteractor)
-	announcementHandler := handler.NewAnnouncementHandler(announcementInteractor)
-	rsvpHandler := handler.NewRSVPHandler(rsvpInteractor)
-	settlementHandler := handler.NewSettlementHandler(settlementInteractor)
-	chatHandler := handler.NewChatHandler(chatInteractor)
-	userHandler := handler.NewUserHandler(userInteractor)
-	practiceHandler := handler.NewPracticeHandler(practiceUseCase)
-
 	// Initialize FE-compatible handler (adapter layer)
 	feHandler := handler.NewFEHandler(feInteractor)
 	calendarHandler := handler.NewCalendarHandler(feInteractor)
 	lineWebhookHandler := handler.NewLineWebhookHandler(feInteractor)
 
-	// Setup router — existing routes
-	mux := router.Setup(
-		circleHandler,
-		eventHandler,
-		announcementHandler,
-		rsvpHandler,
-		settlementHandler,
-		chatHandler,
-		userHandler,
-		practiceHandler,
-	)
+	// Setup router
+	mux := http.NewServeMux()
+	router.SetupRoot(mux)
 
 	// Setup FE-compatible routes under /api prefix
 	router.SetupFE(mux, feHandler)
