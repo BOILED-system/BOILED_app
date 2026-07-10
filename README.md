@@ -11,9 +11,9 @@ BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理�
 ```
 [ブラウザ (Next.js / Vercel)]
         ↓ /api/* (REST)
-[Go API サーバー (Cloud Run)]
-        ↓
-[Firestore]          [Firebase Storage]
+[Go API サーバー (Cloud Run)]  ←  [GAS シート同期] [LINE Webhook]
+        ↓                            ↓ (通知)
+[Firestore]          [Firebase Storage]      [Discord]
                            ↑
               画像アップロードのみフロントから直接
 ```
@@ -33,7 +33,35 @@ BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理�
 | ストレージ | Firebase Storage (イベント画像) |
 | 認証 | 会員番号ログイン（localStorage、Firebase Auth不使用） |
 | デプロイ | フロントエンド: Vercel / バックエンド: Cloud Run |
-| CI/CD | GitHub Actions (mainブランチへのpushで自動デプロイ) |
+| CI/CD | GitHub Actions (mainブランチの `be/` 変更で自動デプロイ) |
+
+---
+
+## リポジトリ構成
+
+```
+BOILED_app/
+├── be/                          # Go バックエンドAPI
+│   ├── main.go                  # エントリーポイント・DI
+│   ├── cmd/seed/                # ローカル開発用シードスクリプト
+│   ├── domain/                  # エンティティ（依存なし）
+│   ├── usecase/                 # ビジネスロジック
+│   ├── adapter/http/            # HTTPハンドラ・ルーティング・DTO
+│   └── infra/                   # Firestore実装・キャッシュ層・Discord通知
+├── fe/                          # Next.js フロントエンド
+│   └── src/
+│       ├── app/                 # ページ（App Router）
+│       ├── components/          # 共通UIコンポーネント
+│       └── lib/
+│           ├── api.ts           # バックエンドAPIクライアント
+│           ├── types.ts         # 共通型定義
+│           └── firebase.ts      # Firebase Storage初期化
+├── scripts/
+│   └── sync-practices.gs        # スプレッドシート→アプリ/カレンダー同期（GAS）
+├── infra/terraform/             # GCPインフラ定義（Terraform）
+├── docs/                        # 設計資料（archive/ は歴史的資料）
+└── .github/workflows/           # CI/CD（GitHub Actions）
+```
 
 ---
 
@@ -44,7 +72,8 @@ BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理�
 | ログイン | `/` | 会員番号を入力してログイン |
 | プロフィール | `/profile` | 自分の情報・直近の練習・未払い精算のアラート |
 | 練習一覧 | `/practices` | 自分が対象の練習一覧、出欠登録（GO/NO/LATE/EARLY）・作成フォーム |
-| 練習詳細 | `/practices/project/[name]` | 練習プロジェクトの詳細・出欠状況・編集・削除 |
+| 練習詳細 | `/practices/project/[name]` | 練習プロジェクトの詳細・出欠・コレオ登録・編集・削除 |
+| 出欠表 | `/practices/group/[name]` | プロジェクト全体の出欠マトリクス・CSV出力 |
 | カレンダー | `/calendar` | 練習・イベントをカレンダー表示、Googleカレンダー連携 |
 | イベント一覧 | `/events` | イベント一覧・作成フォーム |
 | イベント詳細 | `/events/[id]` | タイムテーブル・集合情報・画像ギャラリー・編集 |
@@ -72,119 +101,7 @@ BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理�
 | 追加 | additionalMemberIds | 上記の対象外でも強制的に追加するメンバー |
 | 除外 | excludedMemberIds | 対象に含まれていても除外するメンバー |
 
----
-
-## ローカル開発
-
-本番DBに触らずに、Firestore Emulatorで完全ローカル開発できる。
-
-### 必要なもの
-
-| ツール | 用途 |
-|--------|------|
-| Java 11+ | Firestore Emulator が内部で利用 (`brew install openjdk@17`) |
-| Firebase CLI | Emulator 起動 (`npm install -g firebase-tools`) |
-| Go 1.22+ | バックエンド |
-| Node.js | フロント |
-
-### 初回セットアップ
-
-```bash
-make dev-setup
-```
-
-`be/.env.local` と `fe/.env.local` がサンプルから作成される。値は基本そのままでOK。
-
-### 起動
-
-3つのターミナルで並行起動する。
-
-```bash
-# ターミナル1: Firestore Emulator (8085 / Web UI: 4000)
-make emulator
-
-# ターミナル2: シード投入（初回のみ・必要な時に）
-make seed
-
-# ターミナル2 or 3: Goバックエンド (8080)
-make backend
-
-# ターミナル3 or 4: Next.jsフロント (3000)
-make frontend
-```
-
-### 仕組み
-
-- Firestore SDK は環境変数 `FIRESTORE_EMULATOR_HOST` が設定されていれば自動でEmulatorに接続するため、本番用コードは一切変更していない
-- シードスクリプト (`be/cmd/seed`) は `FIRESTORE_EMULATOR_HOST` が未設定だと起動を拒否するので、誤って本番に書き込む心配なし
-- Emulatorのデータはプロセス停止時に消える（必要なら `firebase.json` に `emulators.firestore.dataDir` を追加して永続化可能）
-
-### シードに含まれるユーザー
-
-| 会員番号 | 名前 | 役割 |
-|----------|------|------|
-| 10001 | 管理者 太郎 | admin |
-| 10002 | 佐藤 花子 | member |
-| 10003 | 田中 次郎 | member |
-
-ログイン画面でこれらの会員番号を入力すると、それぞれのアカウントで動作確認できる。
-
----
-
-## カレンダー連携
-
-`/calendar` ページからGoogleカレンダーへの追加が可能。
-
-- **練習カレンダー**: 自分が対象の練習のみ表示 (`/api/calendar/practices.ics?memberId=xxx`)
-- **イベントカレンダー**: 全イベントを終日表示 (`/api/calendar/events.ics`)
-
-一度追加すると自動購読され、最大24時間以内に新しい練習・イベントが自動反映される。
-
----
-
-## Firestoreコレクション
-
-```
-users/
-  {memberId}             # name, role, genre, generation
-
-practiceSessions/
-  {sessionId}            # name, date, startTime, endTime, location, note,
-                         # targetType, targetGenres[], targetGenerations[],
-                         # targetNumberId, targetMemberIds[],
-                         # additionalMemberIds[], excludedMemberIds[]
-  rsvps/
-    {memberId}           # status(GO|NO|LATE|EARLY), note
-
-events/
-  {eventId}              # title, date, location, meetingTime, meetingLocation,
-                         # timetable[], timetableImageUrl, note, imageUrls[]
-
-numberRosters/
-  {rosterId}             # name, memberIds[]
-
-settlements/
-  {settlementId}         # title, amount, dueDate, paymentMethods[],
-                         # bankInfo, paypayInfo, cashCollectors[],
-                         # targetType, resolvedMemberIds[], requiresConfirmation,
-                         # additionalMemberIds[], excludedMemberIds[]
-  payments/
-    {memberId}           # status(unpaid|reported|confirmed), reportedMethod
-```
-
----
-
-## 認証の仕組み
-
-Firebase Authは使用していない。会員番号をFirestoreの `users` コレクションで照合し、一致したら以下をlocalStorageに保存する。
-
-| キー | 内容 |
-|------|------|
-| `memberId` | 会員番号 |
-| `userName` | 名前 |
-| `userRole` | `admin` または `member` |
-
-ログアウトするとlocalStorageが削除され、全ページがログイン画面にリダイレクトされる。
+このほか、プロジェクト単位で `choreoMemberIds`（コレオ登録メンバー）を設定でき、出欠表の先頭に表示される。
 
 ---
 
@@ -245,13 +162,130 @@ make frontend
 
 ---
 
+## API 概要
+
+すべて `/api` プレフィックス付き。主要ルート:
+
+| ルート | 説明 |
+|--------|------|
+| `POST /api/login` | 会員番号ログイン |
+| `GET/POST/PUT/DELETE /api/users...` | メンバー管理 |
+| `GET/POST/PUT/DELETE /api/practice-sessions...` | 練習セッション |
+| `GET/POST /api/practice-sessions/{id}/rsvps...` | 出欠登録 |
+| `GET/POST/PUT/DELETE /api/number-rosters...` | ナンバー名簿 |
+| `GET/POST/PUT/DELETE /api/events...` | イベント |
+| `GET/POST/PUT/DELETE /api/settlements...` | 精算・支払い |
+| `GET /api/calendar/practices.ics` `events.ics` | iCalフィード |
+| `POST /api/admin/sync-practices` | シート同期（GASから呼ばれる） |
+| `POST /api/line/webhook` ほか `/api/line/*` | LINE連携 |
+| `GET /health` | ヘルスチェック |
+
+ルート定義: `be/adapter/http/router/fe_router.go`
+
+---
+
+## Firestoreコレクション
+
+```
+users/
+  {memberId}             # name, furigana, role, genre, generation
+
+practiceSessions/
+  {sessionId}            # name, date, endDate, isOvernight, startTime, endTime,
+                         # location, note, type, targetType, targetGenres[],
+                         # targetGenerations[], targetNumberId, targetMemberIds[],
+                         # additionalMemberIds[], excludedMemberIds[],
+                         # choreoMemberIds[], updatedAt, sheetSyncedAt
+  rsvps/
+    {memberId}           # status(GO|NO|LATE|EARLY), note
+
+events/
+  {eventId}              # title, date, location, meetingTime, meetingLocation,
+                         # timetable[], timetableImageUrl, note, imageUrls[]
+
+numberRosters/
+  {rosterId}             # name, memberIds[]
+
+settlements/
+  {settlementId}         # title, amount, dueDate, paymentMethods[],
+                         # bankInfo, paypayInfo, cashCollectors[],
+                         # targetType, resolvedMemberIds[], requiresConfirmation,
+                         # additionalMemberIds[], excludedMemberIds[]
+  payments/
+    {memberId}           # status(unpaid|reported|confirmed), reportedMethod
+
+lineMessages/
+  {id}                   # LINE Webhookで受信したメッセージ（イベント紐付け可能）
+```
+
+コレクション名の正は `be/infra/firestore/fe_*.go` の定数。
+※ `firestore.indexes.json` には過去に使っていたコレクション（practice_series 等）の
+インデックス定義が残っているが無害なため意図的に放置している。
+
+---
+
+## 認証の仕組み
+
+Firebase Authは使用していない。会員番号をFirestoreの `users` コレクションで照合し、一致したら以下をlocalStorageに保存する。
+
+| キー | 内容 |
+|------|------|
+| `memberId` | 会員番号 |
+| `userName` | 名前 |
+| `userRole` | `admin` または `member` |
+
+ログアウトするとlocalStorageが削除され、全ページがログイン画面にリダイレクトされる。
+
+---
+
+## 外部連携
+
+### スプレッドシート同期（GAS）
+
+`scripts/sync-practices.gs` をスタジオ予定表スプレッドシートのApps Scriptに配置して使う。
+
+- **シート → Googleカレンダー**: ジャンルごとのカレンダーに練習予定を自動登録
+- **シート → アプリ**: `POST /api/admin/sync-practices` に練習データを送信（`X-Sync-Token` で認証）
+- 毎朝9時の時間トリガー + シートのメニューから手動実行が可能
+- アプリ側で編集済みのセッションはシート同期で上書きせず、食い違いをDiscordに通知する
+
+### LINE Webhook
+
+`POST /api/line/webhook` でグループのメッセージを受信し、イベント詳細ページから紐付けできる。
+
+### Discord通知
+
+イベント練当日の出欠変更や、シート同期の競合を Discord Webhook で通知する（`be/infra/discord/`）。
+
+### カレンダー連携
+
+`/calendar` ページからGoogleカレンダーへの追加が可能。
+
+- **練習カレンダー**: 自分が対象の練習のみ表示 (`/api/calendar/practices.ics?memberId=xxx`)
+- **イベントカレンダー**: 全イベントを終日表示 (`/api/calendar/events.ics`)
+
+一度追加すると自動購読され、最大24時間以内に新しい練習・イベントが自動反映される。
+
+---
+
 ## デプロイ
 
 ### バックエンド（Cloud Run）
 
-mainブランチの `be/` 配下に変更をpushすると、GitHub Actionsが自動でビルド・デプロイを実行する。
+mainブランチの `be/` 配下に変更をpushすると、GitHub Actions（`.github/workflows/deploy-api.yml`）が自動でビルド・デプロイを実行する。
 
-手動でデプロイする場合：
+> ⚠️ **現在、リポジトリにGitHub Secretsが未設定のため自動デプロイは失敗する。**
+> mainへのマージ ≠ 本番反映。シークレットを設定してパイプラインが復旧した時点で、
+> それまでにマージされた変更が一斉に本番へ出ることに注意。
+
+GitHub Actionsに必要なシークレット（リポジトリのSettings → Secrets）:
+
+| シークレット名 | 内容 |
+|--------------|------|
+| `GCP_SA_KEY` | サービスアカウントのJSONキー |
+| `GCP_PROJECT_ID` | GCPプロジェクトID |
+
+手動でデプロイする場合:
 ```bash
 cd be
 gcloud builds submit --tag gcr.io/boiled-app-bb43e/circle-api
@@ -261,18 +295,11 @@ gcloud run deploy circle-api \
   --allow-unauthenticated
 ```
 
-GitHub Actionsに必要なシークレット（リポジトリのSettings → Secrets）：
-
-| シークレット名 | 内容 |
-|--------------|------|
-| `GCP_SA_KEY` | サービスアカウントのJSONキー |
-| `GCP_PROJECT_ID` | GCPプロジェクトID |
-
 ### フロントエンド（Vercel）
 
 mainブランチへのpushで自動デプロイされる。
 
-Vercelに設定が必要な環境変数：
+Vercelに設定が必要な環境変数:
 
 | 変数名 | 値 |
 |--------|-----|
@@ -283,45 +310,37 @@ Vercelに設定が必要な環境変数：
 ## Firebase Storageの設定
 
 イベント画像のアップロードにはCORS設定が必要（初回・本番ドメイン追加時のみ）。
+以下の内容で `cors.json` を作成して適用する（リポジトリには含まれていない）。
+
+```json
+[
+  {
+    "origin": ["https://boiled-app.vercel.app", "http://localhost:3000"],
+    "method": ["GET", "PUT", "POST", "DELETE"],
+    "maxAgeSeconds": 3600
+  }
+]
+```
 
 ```bash
 gsutil cors set cors.json gs://boiled-app-bb43e.firebasestorage.app
 ```
 
-`cors.json` はリポジトリルートに配置済み。
-
 ---
 
-## ディレクトリ構成
+## docs/ の読み方
 
-```
-BOILED_app/
-├── be/                          # Go バックエンドAPI
-│   ├── main.go                  # エントリーポイント・DIコンテナ
-│   ├── domain/                  # エンティティ（依存なし）
-│   ├── usecase/                 # ビジネスロジック
-│   ├── adapter/http/            # HTTPハンドラ・ルーティング
-│   └── infra/                   # Firestore実装・キャッシュ層
-├── fe/                          # Next.js フロントエンド
-│   └── src/
-│       ├── app/                 # ページ（App Router）
-│       ├── components/          # 共通UIコンポーネント
-│       └── lib/
-│           ├── api.ts           # バックエンドAPIクライアント
-│           ├── types.ts         # 共通型定義
-│           └── firebase.ts      # Firebase Storage初期化
-├── infra/terraform/             # GCPインフラ定義（Terraform）
-├── .github/workflows/           # CI/CD（GitHub Actions）
-├── docker-compose.yml           # ローカル開発用
-└── cors.json                    # Firebase Storage CORS設定
-```
+- `docs/design_*.md` — 機能の設計資料。実装と細部が異なる場合はコード側が正
+- `docs/archive/` — **歴史的資料**。現在の実装と食い違っている設計書（冒頭に注記あり）
+- `docs/operation_guide.adoc` / `requirements.adoc` — 運用ガイド・要件定義（AsciiDoc）。
+  HTMLが必要なら `asciidoctor` で生成する（生成物はコミットしない）
 
 ---
 
 ## トラブルシューティング
 
 **画像がアップロードできない（CORSエラー）**
-→ `gsutil cors set cors.json gs://boiled-app-bb43e.firebasestorage.app` を実行。
+→ 上記「Firebase Storageの設定」のCORS設定を実行。
 
 **ずっとロード中になる**
 → Firestoreのセキュリティルールが閉じている可能性。Firebaseコンソールで `allow read, write: if true` に設定。
