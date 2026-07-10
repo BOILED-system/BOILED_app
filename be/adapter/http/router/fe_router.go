@@ -7,6 +7,25 @@ import (
 	"github.com/noa/circle-app/api/adapter/http/handler"
 )
 
+// SetupRoot registers the root message and health-check endpoints.
+func SetupRoot(mux *http.ServeMux) {
+	// Root: simple message (avoid 404 when opening URL in browser)
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"message":"Circle API","health":"/health"}`))
+	})
+	// Health check
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+}
+
 // SetupFECalendar registers iCal endpoints.
 func SetupFECalendar(mux *http.ServeMux, calHandler *handler.CalendarHandler) {
 	mux.HandleFunc("GET /api/calendar/practices.ics", calHandler.PracticesICal)
