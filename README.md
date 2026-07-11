@@ -85,7 +85,13 @@ BOILED_app/
 
 ## 権限
 
-ログイン時に全員 `admin` として扱われるため、すべてのメンバーが全機能を利用できる（フラット権限）。
+各メンバーは `users` コレクションの `role` フィールドで `admin` / `member` のいずれかを持つ。
+
+- **全員**: 閲覧・出欠登録・支払い報告・精算作成・CSV出力
+- **adminのみ**: 練習/イベントの新規作成、メンバー管理（追加・一括登録・削除）
+- **編集・削除**: adminまたはその項目の作成者
+
+出し分けはフロントエンドのみで行っており、バックエンドAPIに権限チェックはない（信頼関係前提の意図的な設計）。詳細は [docs/spec.md](docs/spec.md) を参照。
 
 ---
 
@@ -295,6 +301,10 @@ gcloud run deploy circle-api \
   --allow-unauthenticated
 ```
 
+> ⚠️ 本番のCloud Runには `SHEET_SYNC_SECRET`・`LINE_CHANNEL_SECRET`・`DISCORD_WEBHOOK_*` などの
+> 環境変数が**手動で**設定されている（このリポジトリには存在しない）。
+> デプロイ時に消さないこと。一覧と役割は [docs/infrastructure.md](docs/infrastructure.md) を参照。
+
 ### フロントエンド（Vercel）
 
 mainブランチへのpushで自動デプロイされる。
@@ -330,10 +340,17 @@ gsutil cors set cors.json gs://boiled-app-bb43e.firebasestorage.app
 
 ## docs/ の読み方
 
-- `docs/design_*.md` — 機能の設計資料。実装と細部が異なる場合はコード側が正
-- `docs/archive/` — **歴史的資料**。現在の実装と食い違っている設計書（冒頭に注記あり）
-- `docs/operation_guide.adoc` / `requirements.adoc` — 運用ガイド・要件定義（AsciiDoc）。
-  HTMLが必要なら `asciidoctor` で生成する（生成物はコミットしない）
+読者タイプ別の案内は [docs/README.md](docs/README.md) にある。
+
+| ドキュメント | 内容 | 主な読者 |
+|-------------|------|---------|
+| [docs/spec.md](docs/spec.md) | アプリ仕様書（機能・権限・データの意味） | 全員 |
+| [docs/operations.md](docs/operations.md) | 運用ハンドブック（日常作業・トラブル対処） | 幹部（非エンジニア可） |
+| [docs/handover.md](docs/handover.md) | 引き継ぎ台帳（アカウント・シークレット・代替わりチェックリスト） | 幹部（**代替わり時必読**） |
+| [docs/infrastructure.md](docs/infrastructure.md) | インフラ全体図（GCP/Vercel/GAS等の構成と設定値の場所） | システム担当 |
+| [docs/architecture.md](docs/architecture.md) | コード構成ガイド（どこを触ればいいか） | エンジニア |
+
+旧設計資料（ハッカソン時代の要件定義・設計計画書）は2026年7月に削除済み。必要なら `git log -- docs/` から参照できる。
 
 ---
 
