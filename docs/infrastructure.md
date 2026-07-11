@@ -46,7 +46,7 @@
 | ├ **Cloud Run** | Go製APIサーバー `circle-api`(東京リージョン) | 〃 | リクエスト従量。無料枠が大きい |
 | ├ **Cloud Firestore** | データベース本体 | Firebaseコンソールからも見える | 読み書き従量。無料枠あり |
 | └ **Firebase Storage** | イベント画像の保存 | console.firebase.google.com | 保存量従量 |
-| **GitHub (`BOILED-system/BOILED_app`)** | コード置き場 + バックエンド自動デプロイ(GitHub Actions) | github.com | 無料 |
+| **GitHub (`BOILED-system/BOILED_app`)** | コード置き場。mainへのpushがVercelとCloud Buildの両デプロイを起動する | github.com | 無料 |
 | **Google Apps Script (GAS)** | スタジオ予定表スプレッドシートに仕込まれた同期スクリプト。毎朝9時に自動実行 | スプレッドシートの「拡張機能 > Apps Script」 | 無料 |
 | **Discord** | 幹部向け通知の受け口(Webhook) | Discordサーバー設定 | 無料 |
 | **LINE Developers** | LINEボット(Messaging API)のチャンネル | developers.line.biz | 無料 |
@@ -92,17 +92,6 @@ Vercelダッシュボード → プロジェクト → Settings → Environment 
 |---------|------|
 | `NEXT_PUBLIC_API_URL` | バックエンドAPIのURL(Cloud RunのURL)。**`NEXT_PUBLIC_API_BASE_URL` ではない**(過去の資料の誤記) |
 
-### GitHubリポジトリのSecrets
-
-Settings → Secrets and variables → Actions。バックエンド自動デプロイ用。
-
-| Secret | 役割 |
-|--------|------|
-| `GCP_SA_KEY` | GCPサービスアカウントのJSONキー |
-| `GCP_PROJECT_ID` | GCPプロジェクトID |
-
-> ⚠️ 2026年7月時点で**未設定のため自動デプロイは失敗する**。`main` にマージしても本番のバックエンドには反映されない。手動デプロイ手順は [operations.md](operations.md) 参照。
-
 ### その他の手動設定
 
 | 設定 | 場所 | 内容 |
@@ -116,10 +105,14 @@ Settings → Secrets and variables → Actions。バックエンド自動デプ�
 
 ## デプロイの経路
 
-| 対象 | 経路 | 状態 |
-|------|------|------|
-| フロントエンド | `main` にpush → Vercelが自動デプロイ | ✅ 動いている |
-| バックエンド | `main` の `be/` 配下にpush → GitHub Actions(`.github/workflows/deploy-api.yml`)がCloud Runへデプロイ | ⚠️ Secrets未設定で失敗中。手動デプロイで代替([operations.md](operations.md)) |
+| 対象 | 経路 | 確認場所 |
+|------|------|---------|
+| フロントエンド | `main` にpush → Vercelが自動デプロイ | Vercelダッシュボード |
+| バックエンド | `main` にpush → **GCP側のCloud Buildトリガー**が自動でビルドしCloud Runへデプロイ | GCPコンソール → Cloud Build(履歴) / Cloud Run(リビジョン) |
+
+- バックエンドのトリガー設定はこのリポジトリの中には存在しない。GCPコンソール → Cloud Build → トリガー にある
+- 自動デプロイは既存の環境変数を引き継ぐ(上の台帳の値が消えることはない)
+- かつて存在したGitHub Actionsのデプロイワークフローは、一度も機能しないままマージのたびに失敗表示を出すだけだったため2026年7月に削除した
 
 ---
 

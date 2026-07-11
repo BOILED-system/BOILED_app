@@ -45,7 +45,6 @@
 | `SHEET_SYNC_SECRET` | Cloud Run環境変数 | GASスクリプトプロパティ `APP_SYNC_TOKEN`(同じ値) | 任意の長いランダム文字列を自分で決めて、**両方に**設定し直す |
 | `LINE_CHANNEL_SECRET` | Cloud Run環境変数 | LINE Developersのチャンネル基本設定(発行元) | LINE Developersで確認して設定し直す |
 | `DISCORD_WEBHOOK_*` 一式 | Cloud Run環境変数 | Discordサーバー設定 → 連携サービス → ウェブフック(発行元) | DiscordでWebhookを再作成してURLを設定し直す |
-| `GCP_SA_KEY`(自動デプロイ用) | GitHub Secrets(現在未設定) | GCPのサービスアカウント | GCPコンソールでサービスアカウントのキーを新規発行してGitHubに登録 |
 | Vercelの `NEXT_PUBLIC_API_URL` | Vercel環境変数 | Cloud RunのURL(秘密ではないが消えると動かない) | Cloud RunコンソールでURLを確認して設定 |
 
 ---

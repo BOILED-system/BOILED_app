@@ -33,7 +33,7 @@ BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理�
 | ストレージ | Firebase Storage (イベント画像) |
 | 認証 | 会員番号ログイン（localStorage、Firebase Auth不使用） |
 | デプロイ | フロントエンド: Vercel / バックエンド: Cloud Run |
-| CI/CD | GitHub Actions (mainブランチの `be/` 変更で自動デプロイ) |
+| CI/CD | フロント: Vercel連携 / バックエンド: GCP側のCloud Buildトリガー（いずれもmainへのpushで自動デプロイ） |
 
 ---
 
@@ -58,9 +58,8 @@ BOILED_app/
 │           └── firebase.ts      # Firebase Storage初期化
 ├── scripts/
 │   └── sync-practices.gs        # スプレッドシート→アプリ/カレンダー同期（GAS）
-├── infra/terraform/             # GCPインフラ定義（Terraform）
-├── docs/                        # 設計資料（archive/ は歴史的資料）
-└── .github/workflows/           # CI/CD（GitHub Actions）
+├── infra/terraform/             # GCPインフラ定義（Terraform・現在は未使用）
+└── docs/                        # ドキュメント（docs/README.md から読む）
 ```
 
 ---
@@ -278,20 +277,15 @@ Firebase Authは使用していない。会員番号をFirestoreの `users` コ�
 
 ### バックエンド（Cloud Run）
 
-mainブランチの `be/` 配下に変更をpushすると、GitHub Actions（`.github/workflows/deploy-api.yml`）が自動でビルド・デプロイを実行する。
+mainブランチへのpushで、**GCP側に設定された継続的デプロイ（Cloud Buildトリガー）** が自動でビルド・デプロイを実行する。トリガーの設定はこのリポジトリではなく、GCPコンソール → Cloud Build → トリガー にある。デプロイの成否も GitHub ではなく GCPコンソール（Cloud Build の履歴 / Cloud Run のリビジョン一覧）で確認する。
 
-> ⚠️ **現在、リポジトリにGitHub Secretsが未設定のため自動デプロイは失敗する。**
-> mainへのマージ ≠ 本番反映。シークレットを設定してパイプラインが復旧した時点で、
-> それまでにマージされた変更が一斉に本番へ出ることに注意。
+> 補足: 以前は `.github/workflows/deploy-api.yml` というGitHub Actionsのワークフローも存在したが、
+> Secrets未設定で一度も動作しておらず（実際のデプロイは常にGCP側トリガー）、
+> マージのたびに失敗表示を出すだけだったため2026年7月に削除した。
 
-GitHub Actionsに必要なシークレット（リポジトリのSettings → Secrets）:
+自動デプロイは既存の環境変数を引き継ぐため、デプロイのたびに再設定する必要はない。
 
-| シークレット名 | 内容 |
-|--------------|------|
-| `GCP_SA_KEY` | サービスアカウントのJSONキー |
-| `GCP_PROJECT_ID` | GCPプロジェクトID |
-
-手動でデプロイする場合:
+手動でデプロイする場合（自動デプロイが使えないときの代替）:
 ```bash
 cd be
 gcloud builds submit --tag gcr.io/boiled-app-bb43e/circle-api
