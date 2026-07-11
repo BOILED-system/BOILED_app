@@ -33,7 +33,7 @@ BOILEDのサークル活動を管理するWebアプリ。練習の出欠管理�
 | ストレージ | Firebase Storage (イベント画像) |
 | 認証 | 会員番号ログイン（localStorage、Firebase Auth不使用） |
 | デプロイ | フロントエンド: Vercel / バックエンド: Cloud Run |
-| CI/CD | GitHub Actions (mainブランチの `be/` 変更で自動デプロイ) |
+| CI/CD | フロント: Vercel連携 / バックエンド: GCP側のCloud Buildトリガー（いずれもmainへのpushで自動デプロイ） |
 
 ---
 
@@ -58,9 +58,8 @@ BOILED_app/
 │           └── firebase.ts      # Firebase Storage初期化
 ├── scripts/
 │   └── sync-practices.gs        # スプレッドシート→アプリ/カレンダー同期（GAS）
-├── infra/terraform/             # GCPインフラ定義（Terraform）
-├── docs/                        # 設計資料（archive/ は歴史的資料）
-└── .github/workflows/           # CI/CD（GitHub Actions）
+├── infra/terraform/             # GCPインフラ定義（Terraform・現在は未使用）
+└── docs/                        # ドキュメント（docs/README.md から読む）
 ```
 
 ---
@@ -85,7 +84,13 @@ BOILED_app/
 
 ## 権限
 
-ログイン時に全員 `admin` として扱われるため、すべてのメンバーが全機能を利用できる（フラット権限）。
+各メンバーは `users` コレクションの `role` フィールドで `admin` / `member` のいずれかを持つ。
+
+- **全員**: 閲覧・出欠登録・支払い報告・精算作成・CSV出力
+- **adminのみ**: 練習/イベントの新規作成、メンバー管理（追加・一括登録・削除）
+- **編集・削除**: adminまたはその項目の作成者
+
+出し分けはフロントエンドのみで行っており、バックエンドAPIに権限チェックはない（信頼関係前提の意図的な設計）。詳細は [docs/spec.md](docs/spec.md) を参照。
 
 ---
 
@@ -272,20 +277,15 @@ Firebase Authは使用していない。会員番号をFirestoreの `users` コ�
 
 ### バックエンド（Cloud Run）
 
-mainブランチの `be/` 配下に変更をpushすると、GitHub Actions（`.github/workflows/deploy-api.yml`）が自動でビルド・デプロイを実行する。
+mainブランチへのpushで、**GCP側に設定された継続的デプロイ（Cloud Buildトリガー）** が自動でビルド・デプロイを実行する。トリガーの設定はこのリポジトリではなく、GCPコンソール → Cloud Build → トリガー にある。デプロイの成否も GitHub ではなく GCPコンソール（Cloud Build の履歴 / Cloud Run のリビジョン一覧）で確認する。
 
-> ⚠️ **現在、リポジトリにGitHub Secretsが未設定のため自動デプロイは失敗する。**
-> mainへのマージ ≠ 本番反映。シークレットを設定してパイプラインが復旧した時点で、
-> それまでにマージされた変更が一斉に本番へ出ることに注意。
+> 補足: 以前は `.github/workflows/deploy-api.yml` というGitHub Actionsのワークフローも存在したが、
+> Secrets未設定で一度も動作しておらず（実際のデプロイは常にGCP側トリガー）、
+> マージのたびに失敗表示を出すだけだったため2026年7月に削除した。
 
-GitHub Actionsに必要なシークレット（リポジトリのSettings → Secrets）:
+自動デプロイは既存の環境変数を引き継ぐため、デプロイのたびに再設定する必要はない。
 
-| シークレット名 | 内容 |
-|--------------|------|
-| `GCP_SA_KEY` | サービスアカウントのJSONキー |
-| `GCP_PROJECT_ID` | GCPプロジェクトID |
-
-手動でデプロイする場合:
+手動でデプロイする場合（自動デプロイが使えないときの代替）:
 ```bash
 cd be
 gcloud builds submit --tag gcr.io/boiled-app-bb43e/circle-api
@@ -294,6 +294,10 @@ gcloud run deploy circle-api \
   --region asia-northeast1 \
   --allow-unauthenticated
 ```
+
+> ⚠️ 本番のCloud Runには `SHEET_SYNC_SECRET`・`LINE_CHANNEL_SECRET`・`DISCORD_WEBHOOK_*` などの
+> 環境変数が**手動で**設定されている（このリポジトリには存在しない）。
+> デプロイ時に消さないこと。一覧と役割は [docs/infrastructure.md](docs/infrastructure.md) を参照。
 
 ### フロントエンド（Vercel）
 
@@ -330,10 +334,17 @@ gsutil cors set cors.json gs://boiled-app-bb43e.firebasestorage.app
 
 ## docs/ の読み方
 
-- `docs/design_*.md` — 機能の設計資料。実装と細部が異なる場合はコード側が正
-- `docs/archive/` — **歴史的資料**。現在の実装と食い違っている設計書（冒頭に注記あり）
-- `docs/operation_guide.adoc` / `requirements.adoc` — 運用ガイド・要件定義（AsciiDoc）。
-  HTMLが必要なら `asciidoctor` で生成する（生成物はコミットしない）
+読者タイプ別の案内は [docs/README.md](docs/README.md) にある。
+
+| ドキュメント | 内容 | 主な読者 |
+|-------------|------|---------|
+| [docs/spec.md](docs/spec.md) | アプリ仕様書（機能・権限・データの意味） | 全員 |
+| [docs/operations.md](docs/operations.md) | 運用ハンドブック（日常作業・トラブル対処） | 幹部（非エンジニア可） |
+| [docs/handover.md](docs/handover.md) | 引き継ぎ台帳（アカウント・シークレット・代替わりチェックリスト） | 幹部（**代替わり時必読**） |
+| [docs/infrastructure.md](docs/infrastructure.md) | インフラ全体図（GCP/Vercel/GAS等の構成と設定値の場所） | システム担当 |
+| [docs/architecture.md](docs/architecture.md) | コード構成ガイド（どこを触ればいいか） | エンジニア |
+
+旧設計資料（ハッカソン時代の要件定義・設計計画書）は2026年7月に削除済み。必要なら `git log -- docs/` から参照できる。
 
 ---
 

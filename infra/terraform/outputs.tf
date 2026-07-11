@@ -20,6 +20,6 @@ output "next_steps" {
        cd be && gcloud builds submit --tag gcr.io/${var.project_id}/circle-api
     3. Set cloud_run_api_image = "gcr.io/${var.project_id}/circle-api:latest" (or the image you built)
     4. terraform apply again to deploy Cloud Run
-    5. Set NEXT_PUBLIC_API_BASE_URL in your frontend (Vercel) to the Cloud Run URL
+    5. Set NEXT_PUBLIC_API_URL in your frontend (Vercel) to the Cloud Run URL
   EOT
 }
