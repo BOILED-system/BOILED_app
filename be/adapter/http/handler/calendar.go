@@ -170,7 +170,8 @@ func writeVEvent(b *strings.Builder, uid, dtstamp, dtstart, dtend, summary, loca
 func writeICalResponse(w http.ResponseWriter, filename, body string) {
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", "inline; filename="+filename)
-	w.Header().Set("Cache-Control", "public, max-age=900")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Published-TTL", "PT15M")
 	_, _ = w.Write([]byte(body))
 }
 
