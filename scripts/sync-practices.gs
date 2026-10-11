@@ -607,5 +607,8 @@ function onOpen() {
     .createMenu('📅カレンダー同期')
     .addItem('カレンダーに同期', 'syncToCalendarWithUI')
     .addItem('トリガーを設定（毎朝9時に自動同期）', 'setupTrigger')
+    .addSeparator()
+    .addItem('出欠表を今すぐ出力', 'exportAttendanceWithUI')
+    .addItem('出欠表トリガーを設定（毎朝9時）', 'setupAttendanceTrigger')
     .addToUi();
 }
