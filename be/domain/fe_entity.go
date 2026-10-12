@@ -43,6 +43,9 @@ type FEPracticeSession struct {
 	// updatedAt > sheetSyncedAt のとき「最終シート同期後にアプリで編集あり」と判定する。
 	UpdatedAt     *time.Time `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
 	SheetSyncedAt *time.Time `json:"sheetSyncedAt,omitempty" firestore:"sheetSyncedAt,omitempty"`
+	// NotifiedConflictSig はこのセッションについて最後にDiscord通知したシート食い違いの署名。
+	// 同じ食い違いを毎朝再通知しないための重複抑制に使う（内容が変わった時だけ再通知する）。
+	NotifiedConflictSig string `json:"notifiedConflictSig,omitempty" firestore:"notifiedConflictSig,omitempty"`
 }
 
 // SheetSyncConflict はシート同期が「アプリ編集済み保護」で上書きできなかった
