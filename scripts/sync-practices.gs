@@ -94,7 +94,7 @@ function normalizeCell(str) {
   str = String(str);
   str = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
   str = str.replace(/　/g, ' ');
-  str = str.replace(/[－―‐‑‒–—]/g, '-');
+  str = str.replace(/[－―‐‑‒–—〜～~]/g, '-');
   str = str.replace(/[．。]/g, '.');
   str = str.replace(/：/g, ':');
   str = str.replace(/／/g, '/');
@@ -237,15 +237,19 @@ function buildExpectedEvents() {
         const beforeTime = cellValue.slice(0, timeIndex).trim();
         const afterTime  = timeMatch ? cellValue.slice(timeIndex + timeMatch[0].length).trim() : '';
 
-        const studioRaw = beforeTime
-          .replace(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/, '')
-          .replace(/\d{1,2}\/\d{1,2}/, '')
-          .replace(/\d{1,2}\([月火水木金土日]\)/, '')
+        const studioBefore = beforeTime
+          .replace(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}(\([月火水木金土日]\))?/, '')
+          .replace(/\d{1,2}\/\d{1,2}(\([月火水木金土日]\))?/, '')
+          .replace(/\d{1,2}日?\([月火水木金土日]\)/, '')
           .replace(/\d{1,2}日/, '')
           .trim();
 
+        // 「18-21 マイスタ」のように時間の後ろにスタジオを書いたセルは、後ろ側をスタジオ名とする。
+        // その場合、鍵番号はスタジオ名に含めたまま残す（🔑を別途付けない）。
+        const studioFromAfter = !studioBefore && /[^\d\s🔑]/u.test(afterTime);
+        const studioRaw  = studioFromAfter ? afterTime : studioBefore;
         const studioName = normalizeStudioName(studioRaw) || '未定';
-        const keyMatch   = afterTime.match(/🔑?(\d+)/);
+        const keyMatch   = studioFromAfter ? null : afterTime.match(/🔑?(\d+)/);
         const keyStr     = keyMatch ? ` 🔑${keyMatch[1]}` : '';
         const nightMark  = isNightPractice ? '🌛深夜練 ' : '';
         const title      = `${nightMark}${category} ${genre.name} ${studioName}${keyStr}`;
