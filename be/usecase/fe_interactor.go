@@ -199,6 +199,20 @@ func scheduleConflicts(old, sheet *domain.FEPracticeSession) []domain.SheetSyncC
 	return out
 }
 
+// conflictSignature は食い違い集合を安定した文字列に畳み込む。
+// 前回通知した署名と比較し、同じ食い違いを毎朝再通知しないために使う。
+// scheduleConflicts はフィールド順が決定的なので、そのまま連結すれば安定する。
+func conflictSignature(conflicts []domain.SheetSyncConflict) string {
+	if len(conflicts) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(conflicts))
+	for _, c := range conflicts {
+		parts = append(parts, c.Field+"\x1f"+c.AppValue+"\x1f"+c.SheetValue)
+	}
+	return strings.Join(parts, "\x1e")
+}
+
 // jstToday は JST での今日の日付("2006-01-02")を返す。
 func jstToday() string {
 	loc, err := time.LoadLocation("Asia/Tokyo")
@@ -275,8 +289,18 @@ func (i *FEInteractor) syncPracticesFromSheet(ctx context.Context, sessions []*d
 		// last-write-wins: アプリが最後のシート同期より後に編集していたらスキップ。
 		// ただし今日以降のセッションでシートと食い違っている場合は通知対象として収集する。
 		if old.UpdatedAt != nil && old.SheetSyncedAt != nil && old.UpdatedAt.After(*old.SheetSyncedAt) {
+			var sc []domain.SheetSyncConflict
 			if s.Date >= today {
-				conflicts = append(conflicts, scheduleConflicts(old, s)...)
+				sc = scheduleConflicts(old, s)
+			}
+			// 同じ食い違いを毎朝再通知しない。前回通知した内容と署名が変わった
+			// （新規・変化・解消）ときだけ通知対象に含め、署名を更新する。
+			sig := conflictSignature(sc)
+			if sig != old.NotifiedConflictSig {
+				conflicts = append(conflicts, sc...)
+				// 署名の記録は付随的な処理。スケジュール項目は上書きせず署名だけ更新する。
+				// 失敗しても同期自体は止めない（次回再通知されるだけ）。
+				_ = i.sessionRepo.Update(ctx, old.ID, map[string]interface{}{"notifiedConflictSig": sig})
 			}
 			continue
 		}
@@ -292,6 +316,11 @@ func (i *FEInteractor) syncPracticesFromSheet(ctx context.Context, sessions []*d
 			"endDate":       s.EndDate,
 			"updatedAt":     now,
 			"sheetSyncedAt": now,
+		}
+		// シートで上書きされたら食い違いは解消済み。記録済みの署名があればクリアして、
+		// 将来また食い違ったときに再通知できるようにする。
+		if old.NotifiedConflictSig != "" {
+			updates["notifiedConflictSig"] = ""
 		}
 		if err := i.sessionRepo.Update(ctx, old.ID, updates); err != nil {
 			return created, conflicts, err

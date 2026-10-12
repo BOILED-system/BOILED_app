@@ -271,9 +271,92 @@ func TestSyncPracticesFromSheet_CollectsConflictsForProtectedSessions(t *testing
 		c.AppValue != "桜丘レンタルスタジオ" || c.SheetValue != "ワークル大久保302" {
 		t.Errorf("unexpected conflict: %+v", c)
 	}
-	// 保護されたセッションは上書きされないこと
-	if len(repo.updated) != 0 {
-		t.Errorf("protected sessions must not be updated: %v", repo.updated)
+	// 保護されたセッションのスケジュール項目は上書きされないこと
+	// （食い違いの通知済み署名を記録する付随的な書き込みは許容する）。
+	scheduleFields := []string{"date", "location", "startTime", "endTime", "endDate", "type", "targetGenres", "isOvernight"}
+	for id, upd := range repo.updated {
+		for _, k := range scheduleFields {
+			if _, ok := upd[k]; ok {
+				t.Errorf("protected session %s must not have schedule field %q overwritten: %v", id, k, upd)
+			}
+		}
+	}
+}
+
+func TestSyncPracticesFromSheet_SuppressesRepeatedConflictNotification(t *testing.T) {
+	synced := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	edited := synced.Add(time.Hour)
+	sheet := []*domain.FEPracticeSession{
+		{Name: "夏イベ期Waack", Date: "2099-08-06", Location: "ワークル大久保302"},
+	}
+
+	// 1回目: 署名未記録 → 食い違いを通知し、署名を記録する。
+	repo := &fakeSessionRepo{
+		sessions: []*domain.FEPracticeSession{
+			{
+				ID: "s1", Name: "夏イベ期Waack", Date: "2099-08-06",
+				Location:  "桜丘レンタルスタジオ",
+				UpdatedAt: tp(edited), SheetSyncedAt: tp(synced),
+			},
+		},
+	}
+	i := newTestInteractor(repo)
+	_, conflicts, err := i.syncPracticesFromSheet(context.Background(), sheet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conflicts) != 1 {
+		t.Fatalf("first sync must report the conflict, got %d: %+v", len(conflicts), conflicts)
+	}
+	sig, ok := repo.updated["s1"]["notifiedConflictSig"].(string)
+	if !ok || sig == "" {
+		t.Fatalf("first sync must record the notified signature, got %v", repo.updated["s1"])
+	}
+
+	// 2回目: 同じ食い違い・署名記録済み → 再通知せず、書き込みもしない。
+	repo2 := &fakeSessionRepo{
+		sessions: []*domain.FEPracticeSession{
+			{
+				ID: "s1", Name: "夏イベ期Waack", Date: "2099-08-06",
+				Location:  "桜丘レンタルスタジオ",
+				UpdatedAt: tp(edited), SheetSyncedAt: tp(synced),
+				NotifiedConflictSig: sig,
+			},
+		},
+	}
+	i2 := newTestInteractor(repo2)
+	_, conflicts2, err := i2.syncPracticesFromSheet(context.Background(), sheet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conflicts2) != 0 {
+		t.Errorf("identical conflict must not be re-notified, got %d: %+v", len(conflicts2), conflicts2)
+	}
+	if len(repo2.updated) != 0 {
+		t.Errorf("no write expected when conflict is unchanged, got %v", repo2.updated)
+	}
+
+	// 3回目: 食い違いの内容が変わった → 再通知し、署名を更新する。
+	repo3 := &fakeSessionRepo{
+		sessions: []*domain.FEPracticeSession{
+			{
+				ID: "s1", Name: "夏イベ期Waack", Date: "2099-08-06",
+				Location:  "別の新スタジオ", // アプリ側の値が変化
+				UpdatedAt: tp(edited), SheetSyncedAt: tp(synced),
+				NotifiedConflictSig: sig,
+			},
+		},
+	}
+	i3 := newTestInteractor(repo3)
+	_, conflicts3, err := i3.syncPracticesFromSheet(context.Background(), sheet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conflicts3) != 1 {
+		t.Errorf("changed conflict must be re-notified, got %d: %+v", len(conflicts3), conflicts3)
+	}
+	if newSig, ok := repo3.updated["s1"]["notifiedConflictSig"].(string); !ok || newSig == sig || newSig == "" {
+		t.Errorf("changed conflict must update the signature, got %v", repo3.updated["s1"])
 	}
 }
 
