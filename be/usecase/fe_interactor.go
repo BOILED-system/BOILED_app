@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -112,9 +113,44 @@ func (i *FEInteractor) CreatePracticeSession(ctx context.Context, s *domain.FEPr
 	return i.sessionRepo.Create(ctx, s)
 }
 
+// UpdatePracticeSession はアプリからの編集を保存する。
+// updatedAt はシート同期で「アプリ編集済みなので上書きしない」判定に使うため、
+// シートが持つスケジュール項目が実際に変わったときだけ更新する。
+// 対象者・メモなどの変更でシート同期が止まらないようにするため。
 func (i *FEInteractor) UpdatePracticeSession(ctx context.Context, id string, data map[string]interface{}) error {
-	data["updatedAt"] = time.Now()
+	old, err := i.sessionRepo.GetByID(ctx, id)
+	if err != nil || old == nil || scheduleChanged(old, data) {
+		data["updatedAt"] = time.Now()
+	} else {
+		delete(data, "updatedAt")
+	}
 	return i.sessionRepo.Update(ctx, id, data)
+}
+
+// scheduleChanged は data がシート同期対象のスケジュール項目を old から変更するかを返す。
+func scheduleChanged(old *domain.FEPracticeSession, data map[string]interface{}) bool {
+	current := map[string]interface{}{
+		"date":        old.Date,
+		"startTime":   old.StartTime,
+		"endTime":     old.EndTime,
+		"endDate":     old.EndDate,
+		"isOvernight": old.IsOvernight,
+		"location":    old.Location,
+		"type":        old.Type,
+	}
+	for key, cur := range current {
+		v, ok := data[key]
+		if !ok {
+			continue
+		}
+		if v == nil {
+			v = reflect.Zero(reflect.TypeOf(cur)).Interface()
+		}
+		if fmt.Sprint(v) != fmt.Sprint(cur) {
+			return true
+		}
+	}
+	return false
 }
 
 func (i *FEInteractor) DeletePracticeSession(ctx context.Context, id string) error {

@@ -54,8 +54,9 @@ func (r *fePracticeSessionRepository) GetByID(ctx context.Context, id string) (*
 	return &s, nil
 }
 
+// Update は data をマージ保存する。updatedAt はシート同期の「アプリ編集済み」判定に使うため
+// ここでは自動付与せず、呼び出し側（usecase）が必要なときだけ設定する。
 func (r *fePracticeSessionRepository) Update(ctx context.Context, id string, data map[string]interface{}) error {
-	data["updatedAt"] = time.Now()
 	_, err := r.client.Collection(fePracticeSessionCollection).Doc(id).Set(ctx, data, firestore.MergeAll)
 	return err
 }

@@ -410,3 +410,44 @@ func TestSyncPracticesFromSheet_SkipsAppEditedSession(t *testing.T) {
 		t.Errorf("app-edited session must be skipped: created=%d updated=%v", created, repo.updated)
 	}
 }
+
+func TestUpdatePracticeSession_TouchesUpdatedAtOnlyOnScheduleChange(t *testing.T) {
+	base := func() *domain.FEPracticeSession {
+		return &domain.FEPracticeSession{
+			ID: "s1", Name: "引退イベ期Hiphop", Date: "2026-11-06",
+			StartTime: "18:00", EndTime: "21:00", Location: "マイスタ", Type: "event",
+		}
+	}
+	cases := []struct {
+		name string
+		data map[string]interface{}
+		want bool
+	}{
+		{"対象者のみ変更", map[string]interface{}{"targetType": "number", "targetNumberId": "n1"}, false},
+		{"同じ値でスケジュール項目も送られてくる", map[string]interface{}{"location": "マイスタ", "startTime": "18:00", "isOvernight": false, "endDate": nil, "targetType": "number"}, false},
+		{"場所を変更", map[string]interface{}{"location": "よもだ"}, true},
+		{"深夜練フラグを変更", map[string]interface{}{"isOvernight": true}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo := &fakeSessionRepo{sessions: []*domain.FEPracticeSession{base()}}
+			if err := newTestInteractor(repo).UpdatePracticeSession(context.Background(), "s1", c.data); err != nil {
+				t.Fatal(err)
+			}
+			_, got := repo.updated["s1"]["updatedAt"]
+			if got != c.want {
+				t.Errorf("updatedAt set = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestUpdatePracticeSession_TouchesUpdatedAtWhenSessionUnknown(t *testing.T) {
+	repo := &fakeSessionRepo{}
+	if err := newTestInteractor(repo).UpdatePracticeSession(context.Background(), "missing", map[string]interface{}{"note": "x"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := repo.updated["missing"]["updatedAt"]; !ok {
+		t.Error("updatedAt should be set when the current session cannot be read")
+	}
+}
